@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gh-inspector"
+version = "0.0.0"
+description = "A CLI tool using gh to rapidly locate and inspect files in remote GitHub repositories without cloning."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Alejandro Cabello Jiménez", email = "alejandro.cabello@es.python.org"}
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "tqdm>=4.65.0",
+    "networkx>=3.0",
+    "numpy>=1.24.0",
+    "plotly>=5.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "ruff>=0.8.0",
+    "pip-tools>=7.0.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.scripts]
+gh-inspector = "main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gh_inspector/src"]
+
+[tool.hatch.build.targets.wheel.sources]
+"gh_inspector/src" = ""
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "I",  # isort
+    "UP", # pyupgrade,
+    "W",  # pycodestyle warnings
+]
+ignore = [
+    "B008", # typer uses function calls in defaults
+    "E501", # line too long, handled by formatter
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
