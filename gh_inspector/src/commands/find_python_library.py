@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
+from packaging.version import parse as parse_version
 from rich.console import Console
 from rich.table import Table
 from tqdm import tqdm
@@ -92,7 +93,8 @@ def print_results(library_versions, libraries, output_format):
             table.add_column("Count", justify="center", style="magenta", width=8)
             table.add_column("Repositories (Files)", style="cyan", no_wrap=False)
 
-            sorted_versions = sorted(library_data[lib_name].keys(), reverse=True)
+            # Sort versions using packaging.version for proper semantic versioning
+            sorted_versions = sorted(library_data[lib_name].keys(), key=parse_version, reverse=True)
             for idx, version in enumerate(sorted_versions):
                 repo_files = library_data[lib_name][version]
                 count = len(repo_files)
