@@ -2,6 +2,7 @@
 
 import typer
 from commands.find_python_library import find_python_library
+from commands.find_python_version import find_python_version
 
 # Initialize Typer app
 app = typer.Typer(
@@ -11,6 +12,7 @@ app = typer.Typer(
 
 # Register commands
 app.command(name="find-python-library")(find_python_library)
+app.command(name="find-python-version")(find_python_version)
 
 
 @app.callback(invoke_without_command=True)

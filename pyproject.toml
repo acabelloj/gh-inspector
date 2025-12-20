@@ -19,6 +19,7 @@ dependencies = [
     "networkx>=3.0",
     "numpy>=1.24.0",
     "plotly>=5.14.0",
+    "packaging>=21.0",
 ]
 
 [project.optional-dependencies]
