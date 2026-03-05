@@ -15,8 +15,8 @@ app = typer.Typer(
 )
 
 # Register commands
-app.command(name="find-python-library")(find_python_library)
-app.command(name="find-python-version")(find_python_version)
+app.command(name="find-python-library", no_args_is_help=True)(find_python_library)
+app.command(name="find-python-version", no_args_is_help=True)(find_python_version)
 
 
 def version_callback(value: bool):
