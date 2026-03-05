@@ -3,6 +3,8 @@ name: Lint Commits
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+    branches-ignore:
+      - release-please--**
 
 permissions:
   pull-requests: read
