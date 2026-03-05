@@ -99,6 +99,62 @@ gh-inspector find-python-library myorg fastapi --format only_repo
 
 ---
 
+### `find-codeowners`
+
+Scan repositories in a GitHub organization for `CODEOWNERS` files, parse them, and display a tree grouped by owner showing their repos and file patterns.
+
+```bash
+gh-inspector find-codeowners <org>
+```
+
+**Examples:**
+
+```bash
+# Show CODEOWNERS tree for all repos in the org
+gh-inspector find-codeowners myorg
+
+# Filter to a specific team
+gh-inspector find-codeowners myorg -t @myorg/backend
+
+# Filter to multiple teams
+gh-inspector find-codeowners myorg -t @myorg/backend -t @myorg/frontend
+
+# List only repo names that have a CODEOWNERS file
+gh-inspector find-codeowners myorg -f only_repo
+
+# Only scan Python repos
+gh-inspector find-codeowners myorg --python-only
+
+# Hide repos that don't have a CODEOWNERS file
+gh-inspector find-codeowners myorg --skip-missing
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format` / `-f` | `default` | Output format: `default` (tree by owner) or `only_repo` |
+| `--team` / `-t` | all | Filter to specific owner(s) (repeatable) |
+| `--python-only` / `-p` | `false` | Only scan Python repos |
+| `--skip-missing` | `false` | Hide repos without CODEOWNERS |
+
+**Searched paths:** `.github/CODEOWNERS`, `CODEOWNERS`, `docs/CODEOWNERS` (first found wins)
+
+**Sample output:**
+
+```
+CODEOWNERS by Owner
+├── @org/backend-team
+│   ├── org/repo1 (*.py, /src/)
+│   └── org/repo2 (*.go)
+├── @org/docs-team
+│   └── org/repo1 (docs/)
+└── @user
+    └── org/repo3 (*)
+```
+
+---
+
 ### `find-python-version`
 
 Detect which Python version each repository targets, by scanning Dockerfiles, `pyproject.toml`, `.python-version`, GitHub Actions workflows, and more.
