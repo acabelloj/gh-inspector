@@ -20,7 +20,7 @@ test: ## Run tests
 	uv run pytest || [ $$? -eq 5 ]
 
 build: ## Build the package
-	uv run hatch build
+	uvx hatch==1.16.5 build
 
 lint-commits: ## Check all commits since main follow Conventional Commits
 	@PATTERN="^(feat|fix|docs|chore|ci|test|refactor|style|build|perf)(\(.+\))?!?: .+"; \
