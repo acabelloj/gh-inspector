@@ -42,6 +42,11 @@ class TestRequirementsParser:
         result = req_parser.extract(content, ["django", "requests"])
         assert result == {"django": "4.2.0", "requests": "2.31.0"}
 
+    def test_case_insensitive(self):
+        content = "Django==4.2.0\n"
+        result = req_parser.extract(content, ["django"])
+        assert result == {"django": "4.2.0"}
+
 
 class TestUvLockParser:
     def test_finds_library(self):
@@ -66,6 +71,11 @@ version = "2.31.0"
         content = (FIXTURES / "uv.lock").read_text()
         result = uv_parser.extract(content, ["django", "requests"])
         assert result == {"django": "4.2.0", "requests": "2.31.0"}
+
+    def test_skips_missing_version(self):
+        content = '[[package]]\nname = "django"\n'
+        result = uv_parser.extract(content, ["django"])
+        assert result == {}
 
 
 class TestPoetryLockParser:
@@ -100,6 +110,14 @@ class TestPipfileLockParser:
         content = (FIXTURES / "Pipfile.lock").read_text()
         result = pipfile_parser.extract(content, ["pytest"])
         assert result == {"pytest": "7.4.0"}
+
+    def test_default_wins_over_develop(self):
+        data = {
+            "default": {"requests": {"version": "==1.0.0"}},
+            "develop": {"requests": {"version": "==2.0.0"}},
+        }
+        result = pipfile_parser.extract(json.dumps(data), ["requests"])
+        assert result == {"requests": "1.0.0"}
 
 
 class TestSetupCfgParser:

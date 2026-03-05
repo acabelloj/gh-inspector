@@ -44,9 +44,13 @@ gh_inspector/
       find_python_library.py # find-python-library command
       find_python_version.py # find-python-version command
   tests/
-    test_find_python_library.py
-    test_find_python_version.py
     test_github_client.py
+    test_main.py
+    find_python_library/
+      fixtures/          # sample dependency files for parser tests
+      test_find_python_library.py
+    find_python_version/
+      test_find_python_version.py
 ```
 
 ## Adding a New Command
@@ -54,7 +58,7 @@ gh_inspector/
 1. Create `gh_inspector/src/commands/<command_name>.py`
 2. Define the command function with Typer annotations
 3. Register it in `gh_inspector/src/main.py`
-4. Add tests in `gh_inspector/tests/test_<command_name>.py`
+4. Add tests in `gh_inspector/tests/<command_name>/test_<command_name>.py`
 
 ## Development Setup
 

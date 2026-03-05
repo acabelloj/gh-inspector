@@ -11,6 +11,7 @@ def extract(content: str, libraries: list[str]) -> dict[str, str]:
         for name, info in data.get(section, {}).items():
             if name.lower() in lower_libs:
                 original = lower_libs[name.lower()]
-                version_str = info.get("version", "")
-                results[original] = version_str.lstrip("=")
+                version_str = info.get("version", "").lstrip("=")
+                if version_str and original not in results:
+                    results[original] = version_str
     return results

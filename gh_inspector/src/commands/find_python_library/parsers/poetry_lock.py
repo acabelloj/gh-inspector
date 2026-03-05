@@ -14,5 +14,7 @@ def extract(content: str, libraries: list[str]) -> dict[str, str]:
         name = package.get("name", "")
         if name.lower() in lower_libs:
             original = lower_libs[name.lower()]
-            results[original] = package.get("version", "")
+            version = package.get("version", "")
+            if version:
+                results[original] = version
     return results
