@@ -89,7 +89,9 @@ class TestParseCodeowners:
         ]
 
     def test_prose_line_without_hash_ignored(self):
-        content = "Misleading name, this should actually be change for mocking multiple service verticals\n*.py @org/backend"
+        content = (
+            "Misleading name, this should actually be change for mocking multiple service verticals\n*.py @org/backend"
+        )
         assert parse_codeowners(content) == [("*.py", ["@org/backend"])]
 
     def test_non_owner_tokens_filtered(self):
