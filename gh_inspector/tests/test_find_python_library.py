@@ -148,7 +148,19 @@ class TestGetMatchingFiles:
         paths = [f for f, _ in files]
         assert "requirements.txt" in paths
         assert "src/requirements.txt" in paths
+        assert "requirements-dev.txt" not in paths
+
+    def test_filters_dev_requirements(self):
+        files = get_matching_files(self.gh_client, "org/repo", ["requirements-dev.txt"])
+        paths = [f for f, _ in files]
+        assert paths == ["requirements-dev.txt"]
+
+    def test_filters_with_glob(self):
+        files = get_matching_files(self.gh_client, "org/repo", ["requirements*.txt"])
+        paths = [f for f, _ in files]
+        assert "requirements.txt" in paths
         assert "requirements-dev.txt" in paths
+        assert "src/requirements.txt" in paths
 
 
 class TestProcessFile:

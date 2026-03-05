@@ -21,11 +21,10 @@ def get_matching_files(gh_client, repo_name, file_types):
     results = []
     for entry in tree:
         path = entry["path"]
+        filename = path.split("/")[-1]
+        if file_types and not any(fnmatch.fnmatch(filename, ft) for ft in file_types):
+            continue
         for parser in PARSERS:
-            if file_types and not any(
-                fnmatch.fnmatch(ft, pattern) for pattern in parser.FILE_PATTERNS for ft in file_types
-            ):
-                continue
             if any(matches_pattern(path, pattern) for pattern in parser.FILE_PATTERNS):
                 results.append((path, parser))
                 break
