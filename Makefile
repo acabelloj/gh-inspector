@@ -39,7 +39,7 @@ e2e: ## Run end-to-end tests against the acabelloj org
 	@echo "Running find-python-version..."
 	@output=$$(uv run gh-inspector find-python-version acabelloj); \
 	echo "$$output"; \
-	echo "$$output" | grep -q "3.13" || (echo "FAIL: expected 3.13 in output" && exit 1)
+	echo "$$output" | grep -q "3.14" || (echo "FAIL: expected 3.14 in output" && exit 1)
 	@echo "Running find-python-library..."
 	@uv run gh-inspector find-python-library acabelloj typer
 	@echo "E2E passed."
