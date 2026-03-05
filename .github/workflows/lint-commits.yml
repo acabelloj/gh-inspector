@@ -1,0 +1,27 @@
+name: Lint Commits
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lint PR title (used as squash commit message)
+        run: |
+          echo "${{ github.event.pull_request.title }}" | \
+          grep -qE "^(feat|fix|docs|chore|ci|test|refactor|style|build|perf)(\(.+\))?!?: .+" \
+          || (echo "PR title must follow Conventional Commits: https://www.conventionalcommits.org" && exit 1)
+
+      - name: Lint all commits in PR
+        uses: wagoid/commitlint-github-action@6cf16efdf4da5277c791d335142c03a0bdf1766e  # v6.2.1
+        with:
+          configFile: commitlint.config.mjs
