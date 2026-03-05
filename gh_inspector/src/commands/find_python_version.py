@@ -175,13 +175,31 @@ def find_python_version(
         None,
         "--file-types",
         "-f",
-        help="Specific file patterns to search (e.g., 'Dockerfile', 'pyproject.toml'). If not specified, all default patterns are used.",
+        help="File patterns to search for Python version declarations. Can be repeated. Supported file types: Dockerfile, Pulumi.prod.yaml, .python-version, pyproject.toml, setup.py, .github/workflows/*.yml, .github/workflows/*.yaml, tox.ini. When omitted, all of the above are scanned.",
     ),
     all_repositories: bool = typer.Option(
-        False, "--all-repositories", "-a", help="Check all repos regardless of language"
+        False,
+        "--all-repositories",
+        "-a",
+        help="Scan every repository in the organization. By default only repositories whose primary language is Python are checked.",
     ),
 ):
-    """Analyze Python version usage across repositories of a GitHub organization."""
+    """Analyze Python version usage across repositories of a GitHub organization.
+
+    Examples:
+
+        Scan all default file patterns in Python repos:
+            gh-inspector find-python-version my-org
+
+        Only look in Dockerfiles and pyproject.toml:
+            gh-inspector find-python-version my-org -f Dockerfile -f pyproject.toml
+
+        Only look in GitHub Actions workflows:
+            gh-inspector find-python-version my-org -f '.github/workflows/*.yml'
+
+        Include non-Python repos in the scan:
+            gh-inspector find-python-version my-org --all-repositories
+    """
     gh_client = GitHubClient()
     file_patterns = file_types if file_types else FILE_PATTERNS
     repos = gh_client.get_repos(org_name, all_repositories)
