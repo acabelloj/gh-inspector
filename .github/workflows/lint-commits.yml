@@ -3,14 +3,13 @@ name: Lint Commits
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-    branches-ignore:
-      - release-please--**
 
 permissions:
   pull-requests: read
 
 jobs:
   commitlint:
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
