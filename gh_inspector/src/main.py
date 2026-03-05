@@ -40,6 +40,7 @@ def main(
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
+    typer.echo(f"gh-inspector v{__version__}\n")
 
 
 if __name__ == "__main__":
