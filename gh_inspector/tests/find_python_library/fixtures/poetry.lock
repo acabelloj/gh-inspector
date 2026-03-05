@@ -1,0 +1,28 @@
+[[package]]
+name = "django"
+version = "4.2.0"
+description = "A high-level Python web framework"
+optional = false
+python-versions = ">=3.8"
+files = []
+
+[[package]]
+name = "requests"
+version = "2.31.0"
+description = "Python HTTP for Humans."
+optional = false
+python-versions = ">=3.7"
+files = []
+
+[[package]]
+name = "gunicorn"
+version = "21.2.0"
+description = "WSGI HTTP Server for UNIX"
+optional = false
+python-versions = ">=3.5"
+files = []
+
+[metadata]
+lock-version = "2.0"
+python-versions = "^3.10"
+content-hash = "abc123"
