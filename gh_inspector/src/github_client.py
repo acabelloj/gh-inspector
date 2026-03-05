@@ -30,7 +30,7 @@ class GitHubClient:
         Raises:
             Exception: If the command fails or times out
         """
-        timeout = timeout or self.timeout
+        timeout = self.timeout if timeout is None else timeout
         try:
             result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
             if result.returncode == 0:
