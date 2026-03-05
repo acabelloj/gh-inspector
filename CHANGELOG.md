@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.1...gh-inspector-v0.2.2) (2026-03-05)
+
+
+### Bug Fixes
+
+* handle timeout=0 correctly in GitHubClient ([#24](https://github.com/acabelloj/gh-inspector/issues/24)) ([4fdc622](https://github.com/acabelloj/gh-inspector/commit/4fdc6221caf0b6a08c8faca417587e83b1d9b41e))
+
 ## [0.2.1](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.0...gh-inspector-v0.2.1) (2026-03-05)
 
 
