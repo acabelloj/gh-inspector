@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.2...gh-inspector-v0.3.0) (2026-03-05)
+
+
+### Features
+
+* add find-codeowners command ([#28](https://github.com/acabelloj/gh-inspector/issues/28)) ([cd30a1e](https://github.com/acabelloj/gh-inspector/commit/cd30a1e344434a943a33094a977b9082d87ac100))
+
+
+### Documentation
+
+* improve CLI help text with examples and accepted values ([#26](https://github.com/acabelloj/gh-inspector/issues/26)) ([e78be67](https://github.com/acabelloj/gh-inspector/commit/e78be67443a851808216be37ab7dfa8863935a54))
+
 ## [0.2.2](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.1...gh-inspector-v0.2.2) (2026-03-05)
 
 
