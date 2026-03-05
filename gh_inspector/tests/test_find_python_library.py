@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from commands.find_python_library import get_matching_files, process_file
@@ -8,6 +9,8 @@ from commands.find_python_library.parsers import poetry_lock as poetry_parser
 from commands.find_python_library.parsers import requirements as req_parser
 from commands.find_python_library.parsers import setup_cfg as setup_cfg_parser
 from commands.find_python_library.parsers import uv_lock as uv_parser
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class TestRequirementsParser:
@@ -29,6 +32,16 @@ class TestRequirementsParser:
     def test_requirements_in_pattern(self):
         assert "requirements*.in" in req_parser.FILE_PATTERNS
 
+    def test_with_fixture_file(self):
+        content = (FIXTURES / "requirements.txt").read_text()
+        result = req_parser.extract(content, ["django", "requests"])
+        assert result == {"django": "4.2.0", "requests": "2.31.0"}
+
+    def test_with_requirements_in_fixture(self):
+        content = (FIXTURES / "requirements.in").read_text()
+        result = req_parser.extract(content, ["django", "requests"])
+        assert result == {"django": "4.2.0", "requests": "2.31.0"}
+
 
 class TestUvLockParser:
     def test_finds_library(self):
@@ -49,12 +62,22 @@ version = "2.31.0"
         result = uv_parser.extract(content, ["django"])
         assert result == {"django": "4.2.0"}
 
+    def test_with_fixture_file(self):
+        content = (FIXTURES / "uv.lock").read_text()
+        result = uv_parser.extract(content, ["django", "requests"])
+        assert result == {"django": "4.2.0", "requests": "2.31.0"}
+
 
 class TestPoetryLockParser:
     def test_finds_library(self):
         content = '[[package]]\nname = "requests"\nversion = "2.31.0"\n'
         result = poetry_parser.extract(content, ["requests"])
         assert result == {"requests": "2.31.0"}
+
+    def test_with_fixture_file(self):
+        content = (FIXTURES / "poetry.lock").read_text()
+        result = poetry_parser.extract(content, ["django", "requests"])
+        assert result == {"django": "4.2.0", "requests": "2.31.0"}
 
 
 class TestPipfileLockParser:
@@ -68,12 +91,27 @@ class TestPipfileLockParser:
         result = pipfile_parser.extract(json.dumps(data), ["pytest"])
         assert result == {"pytest": "7.0.0"}
 
+    def test_with_fixture_file_default_section(self):
+        content = (FIXTURES / "Pipfile.lock").read_text()
+        result = pipfile_parser.extract(content, ["django", "requests"])
+        assert result == {"django": "4.2.0", "requests": "2.31.0"}
+
+    def test_with_fixture_file_develop_section(self):
+        content = (FIXTURES / "Pipfile.lock").read_text()
+        result = pipfile_parser.extract(content, ["pytest"])
+        assert result == {"pytest": "7.4.0"}
+
 
 class TestSetupCfgParser:
     def test_finds_library(self):
         content = "[options]\ninstall_requires =\n    django==4.2.0\n    requests==2.31.0\n"
         result = setup_cfg_parser.extract(content, ["django"])
         assert result == {"django": "4.2.0"}
+
+    def test_with_fixture_file(self):
+        content = (FIXTURES / "setup.cfg").read_text()
+        result = setup_cfg_parser.extract(content, ["django", "requests"])
+        assert result == {"django": "4.2.0", "requests": "2.31.0"}
 
 
 class TestGetMatchingFiles:
