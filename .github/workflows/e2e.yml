@@ -1,0 +1,36 @@
+name: E2E
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+
+      - uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
+
+      - name: Install package
+        run: uv sync
+
+      - name: find-python-version — runs without error
+        run: uv run gh-inspector find-python-version acabelloj
+
+      - name: find-python-version — detects Python 3.13 from CI workflow
+        run: |
+          output=$(uv run gh-inspector find-python-version acabelloj)
+          echo "$output"
+          echo "$output" | grep -q "3.13" || (echo "FAIL: expected 3.13 in output" && exit 1)
+
+      - name: find-python-library — runs without error
+        run: uv run gh-inspector find-python-library acabelloj typer

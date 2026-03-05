@@ -16,12 +16,12 @@ class GitHubClient:
         """
         self.timeout = timeout
 
-    def run_command(self, command: str, timeout: int = None) -> str:
+    def run_command(self, args: list[str], timeout: int = None) -> str:
         """
         Execute a GitHub CLI command.
 
         Args:
-            command: The command to execute
+            args: The command and arguments as a list
             timeout: Optional timeout override for this command
 
         Returns:
@@ -32,13 +32,13 @@ class GitHubClient:
         """
         timeout = timeout or self.timeout
         try:
-            result = subprocess.run(command, capture_output=True, text=True, shell=True, timeout=timeout)
+            result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
             if result.returncode == 0:
                 return result.stdout.strip()
             else:
-                raise Exception(f"Error executing command '{command}': {result.stderr}")
+                raise Exception(f"Error executing command '{' '.join(args)}': {result.stderr}")
         except subprocess.TimeoutExpired as e:
-            raise Exception(f"Command '{command}' timed out after {timeout} seconds") from e
+            raise Exception(f"Command '{' '.join(args)}' timed out after {timeout} seconds") from e
 
     def get_repos(self, org_name: str, all_repositories: bool = False) -> list[dict[str, Any]]:
         """
@@ -51,9 +51,21 @@ class GitHubClient:
         Returns:
             List of repository information dictionaries
         """
-        filter_by_language = "--language Python" if not all_repositories else ""
-        command = f"gh repo list {org_name} --limit 1000 {filter_by_language} --no-archived --source --json nameWithOwner,isPrivate"
-        result = self.run_command(command)
+        args = [
+            "gh",
+            "repo",
+            "list",
+            org_name,
+            "--limit",
+            "1000",
+            "--no-archived",
+            "--source",
+            "--json",
+            "nameWithOwner,isPrivate",
+        ]
+        if not all_repositories:
+            args += ["--language", "Python"]
+        result = self.run_command(args)
         return json.loads(result)
 
     def get_default_branch(self, repo_name: str) -> str:
@@ -67,8 +79,7 @@ class GitHubClient:
             The default branch name (e.g., 'main', 'master')
         """
         try:
-            command = f"gh api repos/{repo_name} --jq .default_branch"
-            result = self.run_command(command)
+            result = self.run_command(["gh", "api", f"repos/{repo_name}", "--jq", ".default_branch"])
             return result.strip() or "main"
         except Exception:
             return "main"
@@ -86,9 +97,7 @@ class GitHubClient:
         """
         if branch is None:
             branch = self.get_default_branch(repo_name)
-
-        command = f"gh api repos/{repo_name}/git/trees/{branch}?recursive=1"
-        result = self.run_command(command)
+        result = self.run_command(["gh", "api", f"repos/{repo_name}/git/trees/{branch}?recursive=1"])
         return json.loads(result)["tree"]
 
     def get_file_content(self, repo_name: str, file_path: str) -> str:
@@ -102,7 +111,6 @@ class GitHubClient:
         Returns:
             Decoded file content as a string
         """
-        command = f"gh api repos/{repo_name}/contents/{file_path}"
-        result = self.run_command(command)
+        result = self.run_command(["gh", "api", f"repos/{repo_name}/contents/{file_path}"])
         content = json.loads(result)["content"]
         return base64.b64decode(content).decode("utf-8")
