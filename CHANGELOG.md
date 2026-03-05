@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.1.0...gh-inspector-v0.2.0) (2026-03-05)
+
+
+### Features
+
+* add --version flag to CLI ([#10](https://github.com/acabelloj/gh-inspector/issues/10)) ([e689cc3](https://github.com/acabelloj/gh-inspector/commit/e689cc3068cc433685ba675131361e489ba75716))
+* modularize find-python-library with multi-format parser support ([#13](https://github.com/acabelloj/gh-inspector/issues/13)) ([8baf359](https://github.com/acabelloj/gh-inspector/commit/8baf35930da64c090af9639387e26a61fe022ec5))
+
 ## [0.1.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.0.1...gh-inspector-v0.1.0) (2026-03-05)
 
 
