@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-02-13T21:49:00.450048Z"
+exclude-newer = "2026-02-13T22:34:08.343966Z"
 exclude-newer-span = "P20D"
 
 [[package]]
@@ -97,7 +97,7 @@ wheels = [
 
 [[package]]
 name = "gh-inspector"
-version = "0.2.2"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "packaging" },
