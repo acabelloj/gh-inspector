@@ -16,9 +16,6 @@ dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0",
     "tqdm>=4.65.0",
-    "networkx>=3.0",
-    "numpy>=1.24.0",
-    "plotly>=5.14.0",
     "packaging>=21.0",
 ]
 
@@ -32,6 +29,16 @@ dev = [
 
 [project.scripts]
 gh-inspector = "main:app"
+
+[tool.hatch.envs.default.scripts]
+setup = [
+    "pre-commit install",
+    "pre-commit install --hook-type commit-msg",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["gh_inspector/tests"]
+pythonpath = ["gh_inspector/src"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["gh_inspector/src"]

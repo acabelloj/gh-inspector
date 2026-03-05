@@ -31,7 +31,8 @@ PYTHON_VERSION_RE = re.compile(r"\b(py(?:thon)?[-_]?(\d+\.\d+))\b", re.IGNORECAS
 DOCKER_PYTHON_VERSION_RE = re.compile(r"FROM\s+[\w${}/:.\-]*python[-:v]*[\w.]*[-:](\d+\.\d+\.\d+)", re.IGNORECASE)
 PYPROJECT_VERSION_RE = re.compile(r'python\s*=\s*["\'][\^~>=<]*(\d+\.\d+)', re.IGNORECASE)
 SETUP_PY_VERSION_RE = re.compile(r'python_requires\s*=\s*["\'][\^~>=<]*(\d+\.\d+)', re.IGNORECASE)
-PYTHON_VERSION_FILE_RE = re.compile(r'^(\d+\.\d+(?:\.\d+)?)$')
+PYTHON_VERSION_FILE_RE = re.compile(r"^(\d+\.\d+(?:\.\d+)?)$")
+GH_ACTIONS_PYTHON_VERSION_RE = re.compile(r'python-version[:\s]+["\']?(\d+\.\d+(?:\.\d+)?)["\']?', re.IGNORECASE)
 
 
 def matches_pattern(file_path, pattern):
@@ -63,6 +64,7 @@ def extract_version_from_content(content):
     """Extract Python version from file content by trying all regex patterns."""
     patterns = [
         PYTHON_VERSION_FILE_RE,
+        GH_ACTIONS_PYTHON_VERSION_RE,
         PYPROJECT_VERSION_RE,
         SETUP_PY_VERSION_RE,
         DOCKER_PYTHON_VERSION_RE,
@@ -110,10 +112,7 @@ def version_key(version):
 def display_summary_table(sorted_versions, python_versions):
     """Display summary table of Python version usage."""
     summary_table = Table(
-        title="Summary - Python Version Usage",
-        show_header=True,
-        header_style="bold magenta",
-        border_style="blue"
+        title="Summary - Python Version Usage", show_header=True, header_style="bold magenta", border_style="blue"
     )
     summary_table.add_column("Python Version", style="yellow", no_wrap=True, width=20)
     summary_table.add_column("Count", justify="center", style="magenta", width=10)
@@ -140,10 +139,7 @@ def display_detail_tables(sorted_versions):
     """Display detailed tables for each Python version."""
     for version, repo_files in sorted_versions:
         detail_table = Table(
-            title=f"Python Version: {version}",
-            show_header=True,
-            header_style="bold green",
-            border_style="blue"
+            title=f"Python Version: {version}", show_header=True, header_style="bold green", border_style="blue"
         )
         detail_table.add_column("Count", justify="center", style="magenta", width=8)
         detail_table.add_column("Repository (File)", style="cyan", no_wrap=False)
@@ -179,7 +175,7 @@ def find_python_version(
         None,
         "--file-types",
         "-f",
-        help="Specific file patterns to search (e.g., 'Dockerfile', 'pyproject.toml'). If not specified, all default patterns are used."
+        help="Specific file patterns to search (e.g., 'Dockerfile', 'pyproject.toml'). If not specified, all default patterns are used.",
     ),
     all_repositories: bool = typer.Option(
         False, "--all-repositories", "-a", help="Check all repos regardless of language"
@@ -213,5 +209,3 @@ def find_python_version(
 
     if no_version_repos:
         display_no_version_table(no_version_repos)
-
-
