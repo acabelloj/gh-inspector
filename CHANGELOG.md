@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.0...gh-inspector-v0.2.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* trigger PyPI publish from release-please workflow ([#14](https://github.com/acabelloj/gh-inspector/issues/14)) ([e3d1674](https://github.com/acabelloj/gh-inspector/commit/e3d1674a821909146297851ca6f317dec028cc2f))
+
 ## [0.2.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.1.0...gh-inspector-v0.2.0) (2026-03-05)
 
 
