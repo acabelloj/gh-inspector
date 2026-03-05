@@ -1,0 +1,16 @@
+{
+    "_meta": {
+        "hash": {"sha256": "abc123"},
+        "pipfile-spec": 6,
+        "requires": {"python_version": "3.10"},
+        "sources": [{"name": "pypi", "url": "https://pypi.org/simple", "verify_ssl": true}]
+    },
+    "default": {
+        "django": {"version": "==4.2.0", "hashes": ["sha256:abc"]},
+        "requests": {"version": "==2.31.0", "hashes": ["sha256:def"]},
+        "gunicorn": {"version": "==21.2.0", "hashes": ["sha256:ghi"]}
+    },
+    "develop": {
+        "pytest": {"version": "==7.4.0", "hashes": ["sha256:jkl"]}
+    }
+}

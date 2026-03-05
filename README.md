@@ -59,7 +59,7 @@ uv tool install gh-inspector
 
 ### `find-python-library`
 
-Scan requirements files across all repositories in a GitHub organization and report which version of a library each repo uses.
+Scan dependency files across all repositories in a GitHub organization and report which version of a library each repo uses.
 
 ```bash
 gh-inspector find-python-library <org> <library> [library2 ...]
@@ -71,8 +71,14 @@ gh-inspector find-python-library <org> <library> [library2 ...]
 # Find Django and requests versions across the org
 gh-inspector find-python-library myorg django requests
 
-# Include dev requirements
-gh-inspector find-python-library myorg pytest --source dev
+# Scan only uv.lock files
+gh-inspector find-python-library myorg typer --file-types uv.lock
+
+# Scan only dev requirements
+gh-inspector find-python-library myorg pytest --file-types requirements-dev.txt
+
+# Scan all requirements txt files (use quotes for globs in shell)
+gh-inspector find-python-library myorg django --file-types "requirements*.txt"
 
 # Search all repos, not just Python ones
 gh-inspector find-python-library myorg pydantic --all-repositories
@@ -86,8 +92,10 @@ gh-inspector find-python-library myorg fastapi --format only_repo
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--format` / `-f` | `default` | Output format: `default` or `only_repo` |
-| `--source` / `-s` | `default` | Requirements source: `default`, `dev`, or `all` |
+| `--file-types` / `-t` | all | File types to scan (repeatable) |
 | `--all-repositories` / `-a` | `false` | Include non-Python repos |
+
+**Supported file types:** `requirements*.txt`, `requirements*.in`, `uv.lock`, `poetry.lock`, `Pipfile.lock`, `setup.cfg`
 
 ---
 
