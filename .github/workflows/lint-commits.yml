@@ -1,0 +1,43 @@
+name: Lint Commits
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lint PR title and all commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          PATTERN="^(feat|fix|docs|chore|ci|test|refactor|style|build|perf)(\(.+\))?!?: .+"
+          FAILED=0
+
+          echo "Checking PR title..."
+          if ! echo "$PR_TITLE" | grep -qE "$PATTERN"; then
+            echo "FAIL: PR title does not follow Conventional Commits"
+            FAILED=1
+          fi
+
+          echo "Checking commits..."
+          git log "origin/$BASE_REF"..HEAD --no-merges --format="%s" | while read msg; do
+            if ! echo "$msg" | grep -qE "$PATTERN"; then
+              echo "FAIL: '$msg'"
+              exit 1
+            fi
+          done || FAILED=1
+
+          if [ $FAILED -ne 0 ]; then
+            echo "See https://www.conventionalcommits.org"
+            exit 1
+          fi
