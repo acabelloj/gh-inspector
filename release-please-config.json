@@ -2,7 +2,8 @@
   "packages": {
     ".": {
       "release-type": "python",
-      "package-name": "gh-inspector"
+      "package-name": "gh-inspector",
+      "bump-minor-pre-major": true
     }
   }
 }
