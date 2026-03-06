@@ -98,15 +98,47 @@ def print_results(library_versions, libraries, output_format):
 def find_python_library(
     org_name: str = typer.Argument(..., help="GitHub organization name"),
     libraries: list[str] = typer.Argument(..., help="List of libraries to analyze"),
-    output_format: str = typer.Option("default", "--format", "-f", help="Output format (default or only_repo)"),
+    output_format: str = typer.Option(
+        "default",
+        "--format",
+        "-f",
+        help="'default' shows a version-by-version breakdown per library; 'only_repo' lists just the repository names that use any of the specified libraries.",
+    ),
     file_types: list[str] = typer.Option(
-        None, "--file-types", "-t", help="File types to scan (repeatable, default=all)"
+        None,
+        "--file-types",
+        "-t",
+        help="Glob patterns for dependency filenames to scan. Can be repeated. Supported file types: requirements*.txt, requirements*.in, uv.lock, poetry.lock, Pipfile.lock, setup.cfg. When omitted, all of the above are scanned.",
     ),
     all_repositories: bool = typer.Option(
-        False, "--all-repositories", "-a", help="Check all repos regardless of language"
+        False,
+        "--all-repositories",
+        "-a",
+        help="Scan every repository in the organization. By default only repositories whose primary language is Python are checked.",
     ),
 ):
-    """Analyze library usage across repositories of a GitHub organization."""
+    """Analyze library usage across repositories of a GitHub organization.
+
+    Examples:
+
+        Search for a single library in Python repos:
+            gh-inspector find-python-library my-org requests
+
+        Search for multiple libraries at once:
+            gh-inspector find-python-library my-org requests boto3 django
+
+        List only repository names (no version breakdown):
+            gh-inspector find-python-library my-org requests -f only_repo
+
+        Scan only uv.lock files:
+            gh-inspector find-python-library my-org requests -t uv.lock
+
+        Scan only requirements files and poetry lock:
+            gh-inspector find-python-library my-org requests -t 'requirements*.txt' -t poetry.lock
+
+        Include non-Python repos in the scan:
+            gh-inspector find-python-library my-org requests --all-repositories
+    """
     gh_client = GitHubClient()
 
     repos = gh_client.get_repos(org_name, all_repositories)
