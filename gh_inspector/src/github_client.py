@@ -40,17 +40,23 @@ class GitHubClient:
         except subprocess.TimeoutExpired as e:
             raise Exception(f"Command '{' '.join(args)}' timed out after {timeout} seconds") from e
 
-    def get_repos(self, org_name: str, all_repositories: bool = False) -> list[dict[str, Any]]:
+    def get_repos(
+        self, org_name: str, all_repositories: bool = False, extra_fields: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Get repositories for an organization.
 
         Args:
             org_name: GitHub organization name
             all_repositories: If True, get all repos. If False, filter by Python language
+            extra_fields: Additional fields to include in the --json query
 
         Returns:
             List of repository information dictionaries
         """
+        fields = "nameWithOwner,isPrivate"
+        if extra_fields:
+            fields += "," + ",".join(extra_fields)
         args = [
             "gh",
             "repo",
@@ -61,7 +67,7 @@ class GitHubClient:
             "--no-archived",
             "--source",
             "--json",
-            "nameWithOwner,isPrivate",
+            fields,
         ]
         if not all_repositories:
             args += ["--language", "Python"]

@@ -4,6 +4,7 @@ from importlib.metadata import version
 
 import typer
 from commands.find_codeowners import find_codeowners
+from commands.find_licenses import find_licenses
 from commands.find_python_library import find_python_library
 from commands.find_python_version import find_python_version
 
@@ -17,6 +18,7 @@ app = typer.Typer(
 
 # Register commands
 app.command(name="find-codeowners", no_args_is_help=True)(find_codeowners)
+app.command(name="find-licenses", no_args_is_help=True)(find_licenses)
 app.command(name="find-python-library", no_args_is_help=True)(find_python_library)
 app.command(name="find-python-version", no_args_is_help=True)(find_python_version)
 
