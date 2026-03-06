@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.3.0...gh-inspector-v0.4.0) (2026-03-06)
+
+
+### Features
+
+* add find-licenses command ([#29](https://github.com/acabelloj/gh-inspector/issues/29)) ([fdb9b41](https://github.com/acabelloj/gh-inspector/commit/fdb9b41d2a5ca39506044276a0729462825c2d70))
+
 ## [0.3.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.2...gh-inspector-v0.3.0) (2026-03-05)
 
 
