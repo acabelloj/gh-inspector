@@ -1,17 +1,14 @@
 import json
 import re
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
 from rich.console import Console
 from rich.table import Table
-from tqdm import tqdm
+from scanner import scan_repos
 
 console = Console()
-
-MAX_WORKERS = 6
 
 
 def extract_license_id(repo: dict) -> str | None:
@@ -214,19 +211,26 @@ def find_licenses(
         Hide repos without a detected license:
             gh-inspector find-licenses my-org --skip-missing
     """
-    gh_client = GitHubClient()
+    gh_client = GitHubClient(console=console)
     repos = gh_client.get_repos(org_name, not python_only, extra_fields=["licenseInfo"])
 
     # For repos where GitHub didn't detect a license or detected "other",
     # try to find it in manifest files (pyproject.toml, setup.cfg, package.json, Cargo.toml).
     needs_fallback = [r for r in repos if extract_license_id(r) in (None, "other")]
     if needs_fallback:
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {executor.submit(_fetch_file_license, gh_client, r["nameWithOwner"]): r for r in needs_fallback}
-            for future in tqdm(as_completed(futures), total=len(futures), desc="Checking manifest files"):
-                repo_name, license_id = future.result()
-                if license_id:
-                    futures[future]["_resolved_license"] = license_id
+        resolved_count = 0
+        for repo, license_id, update in scan_repos(
+            needs_fallback,
+            lambda r: _fetch_file_license(gh_client, r["nameWithOwner"])[1],
+            "Checking manifest files",
+            "resolved",
+            gh_client,
+            console,
+        ):
+            if license_id:
+                repo["_resolved_license"] = license_id
+                resolved_count += 1
+            update(resolved_count)
 
     grouped, unlicensed = group_by_license(repos, exclude, skip_missing)
 

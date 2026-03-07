@@ -2,7 +2,7 @@ import re
 
 from .category import VersionCategory
 
-FILE_PATTERNS = ["Pulumi.*.yaml", "Pulumi.*.yml"]
+FILE_PATTERNS = ["Pulumi.yaml", "Pulumi.yml", "Pulumi.*.yaml", "Pulumi.*.yml"]
 CATEGORY = VersionCategory.RUNTIME
 
 _RE = re.compile(r"python[-_]?version[:\s]+[\"']?(\d+\.\d+(?:\.\d+)?)[\"']?", re.IGNORECASE)

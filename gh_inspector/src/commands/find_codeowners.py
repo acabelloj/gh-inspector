@@ -1,16 +1,13 @@
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
-from tqdm import tqdm
+from scanner import scan_repos
 
 console = Console()
-
-MAX_WORKERS = 6
 
 CODEOWNERS_PATHS = [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"]
 
@@ -35,10 +32,10 @@ def parse_codeowners(content: str) -> list[tuple[str, list[str]]]:
     return entries
 
 
-def find_codeowners_file(gh_client: GitHubClient, repo_name: str) -> str | None:
+def find_codeowners_file(gh_client: GitHubClient, repo_name: str, branch: str | None = None) -> str | None:
     """Return the path of the first CODEOWNERS file found, or None."""
     try:
-        tree = gh_client.get_repo_tree(repo_name)
+        tree = gh_client.get_repo_tree(repo_name, branch)
     except Exception:
         return None
     paths = {entry["path"] for entry in tree}
@@ -51,15 +48,16 @@ def find_codeowners_file(gh_client: GitHubClient, repo_name: str) -> str | None:
 def process_repo(gh_client: GitHubClient, repo: dict) -> tuple[str, list[tuple[str, list[str]]]] | None:
     """Return (repo_name, parsed_entries) or None if no CODEOWNERS found."""
     repo_name = repo["nameWithOwner"]
+    branch = (repo.get("defaultBranchRef") or {}).get("name") or None
     try:
-        codeowners_path = find_codeowners_file(gh_client, repo_name)
+        codeowners_path = find_codeowners_file(gh_client, repo_name, branch)
         if codeowners_path is None:
             return None
         content = gh_client.get_file_content(repo_name, codeowners_path)
         entries = parse_codeowners(content)
         return (repo_name, entries)
     except Exception as e:
-        print(f"Error processing {repo_name}: {e}")
+        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
         return None
 
 
@@ -72,10 +70,7 @@ def aggregate_by_owner(
         for pattern, owners in entries:
             for owner in owners:
                 owner_map[owner][repo_name].append(pattern)
-    return {
-        owner: [(repo, patterns) for repo, patterns in sorted(repos.items())]
-        for owner, repos in sorted(owner_map.items())
-    }
+    return {owner: sorted(repos.items()) for owner, repos in sorted(owner_map.items())}
 
 
 MAX_PATTERNS_SHOWN = 5
@@ -172,20 +167,25 @@ def find_codeowners(
         Hide repos without CODEOWNERS:
             gh-inspector find-codeowners my-org --skip-missing
     """
-    gh_client = GitHubClient()
-    repos = gh_client.get_repos(org_name, not python_only)
+    gh_client = GitHubClient(console=console)
+    repos = gh_client.get_repos(org_name, not python_only, extra_fields=["defaultBranchRef"])
 
     found: list[tuple[str, list[tuple[str, list[str]]]]] = []
     missing: list[str] = []
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_repo, gh_client, repo): repo for repo in repos}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing repos"):
-            result = future.result()
-            if result is None:
-                missing.append(futures[future]["nameWithOwner"])
-            else:
-                found.append(result)
+    for repo, result, update in scan_repos(
+        repos,
+        lambda r: process_repo(gh_client, r),
+        "Scanning repos",
+        "with CODEOWNERS",
+        gh_client,
+        console,
+    ):
+        if result is None:
+            missing.append(repo["nameWithOwner"])
+        else:
+            found.append(result)
+        update(len(found))
 
     if output_format == "only_repo":
         display_repo_table([repo for repo, _ in found])

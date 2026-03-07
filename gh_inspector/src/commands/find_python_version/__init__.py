@@ -9,13 +9,13 @@ from packaging.version import InvalidVersion
 from packaging.version import parse as parse_version
 from rich.console import Console
 from rich.table import Table
-from tqdm import tqdm
+from scanner import scan_repos
 
 from .extractors import EXTRACTORS, VersionCategory
 
 console = Console()
 
-MAX_WORKERS = 6
+FILE_WORKERS = 3
 
 FILE_PATTERNS = [pattern for ext in EXTRACTORS for pattern in ext.FILE_PATTERNS]
 
@@ -41,9 +41,46 @@ def extract_versions_for_file(file_path: str, content: str) -> list[tuple[str, V
     return [(v, extractor.CATEGORY) for v in extractor.extract(content)]
 
 
-def get_files(gh_client, repo_name, file_patterns):
+_ROOT_DIRS = {".github", ".circleci"}
+_PROJECT_MARKERS = frozenset({"pyproject.toml", "setup.py", "setup.cfg", "Pipfile", "Pulumi.yaml", "Pulumi.yml"})
+_PULUMI_STACK_RE = re.compile(r"^Pulumi\..+\.(yaml|yml)$")
+
+
+def _find_project_roots(tree: list[dict]) -> set[str]:
+    """Return directory paths that contain a project marker file."""
+    roots = set()
+    for entry in tree:
+        path = entry["path"]
+        filename = path.rsplit("/", 1)[-1] if "/" in path else path
+        if filename in _PROJECT_MARKERS or _PULUMI_STACK_RE.match(filename):
+            roots.add(path.rsplit("/", 1)[0] if "/" in path else "")
+    return roots
+
+
+def _project_key(file_path: str, project_roots: set[str]) -> str:
+    """Return the sub-project key for a file based on detected project roots.
+
+    Finds the deepest project root directory that is an ancestor of the file.
+    CI dirs (.github, .circleci) always belong to the root project.
+    Falls back to the first directory component for unmatched files.
+    """
+    parts = file_path.split("/")
+    if parts[0] in _ROOT_DIRS:
+        return ""
+    file_dir = "/".join(parts[:-1])
+    best: str | None = None
+    for root in project_roots:
+        if root == "" or file_dir == root or file_dir.startswith(root + "/"):
+            if best is None or len(root) > len(best):
+                best = root
+    if best is not None:
+        return best
+    return parts[0] if len(parts) > 1 else ""
+
+
+def get_files(gh_client, repo_name, file_patterns, branch=None):
     try:
-        tree = gh_client.get_repo_tree(repo_name)
+        tree = gh_client.get_repo_tree(repo_name, branch)
         matched = []
         for file in tree:
             path = file["path"]
@@ -51,40 +88,33 @@ def get_files(gh_client, repo_name, file_patterns):
                 if matches_pattern(path, pattern):
                     matched.append(path)
                     break
-        return matched
+        return matched, _find_project_roots(tree)
     except Exception as e:
-        print(f"Error retrieving file list for {repo_name}: {e}")
-        return []
-
-
-# Directories that belong to the root project even when nested
-_ROOT_DIRS = {".github", ".circleci"}
-
-
-def _project_key(file_path: str) -> str:
-    """Return the sub-project key for a file. Root-level and CI files return ''."""
-    parts = file_path.split("/")
-    if len(parts) == 1 or parts[0] in _ROOT_DIRS:
-        return ""
-    return parts[0]
+        console.print(f"[red]Error retrieving file list for {repo_name}: {e}[/red]")
+        return [], set()
 
 
 def process_repo(gh_client, repo, file_patterns):
     repo_name = repo["nameWithOwner"]
+    branch = (repo.get("defaultBranchRef") or {}).get("name") or None
     projects: dict[str, dict[VersionCategory, dict[str, set[str]]]] = defaultdict(
         lambda: {cat: defaultdict(set) for cat in VersionCategory}
     )
     try:
-        for file in get_files(gh_client, repo_name, file_patterns):
-            try:
-                content = gh_client.get_file_content(repo_name, file)
-                project = _project_key(file)
-                for version, category in extract_versions_for_file(file, content):
-                    projects[project][category][version].add(file)
-            except Exception as e:
-                print(f"Error processing {file} in {repo_name}: {e}")
+        files, project_roots = get_files(gh_client, repo_name, file_patterns, branch)
+        with ThreadPoolExecutor(max_workers=FILE_WORKERS) as file_executor:
+            futures = {file_executor.submit(gh_client.get_file_content, repo_name, f): f for f in files}
+            for future in as_completed(futures):
+                file = futures[future]
+                try:
+                    content = future.result()
+                    project = _project_key(file, project_roots)
+                    for version, category in extract_versions_for_file(file, content):
+                        projects[project][category][version].add(file)
+                except Exception as e:
+                    console.print(f"[red]Error processing {file} in {repo_name}: {e}[/red]")
     except Exception as e:
-        print(f"Error processing {repo_name}: {e}")
+        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
     return repo_name, dict(projects)
 
 
@@ -129,19 +159,26 @@ def check_consistency(
 def _fmt(cat_dict: dict[str, set]) -> str:
     if not cat_dict:
         return "—"
-    # Group files by version
+
+    # Use full paths when basenames clash (e.g. two Dockerfiles in different services)
+    all_paths = [fp for paths in cat_dict.values() for fp in paths]
+    basenames = [p.split("/")[-1] for p in all_paths]
+    use_full_path = len(basenames) != len(set(basenames))
+
     by_version: dict[str, list[str]] = {}
     for version in sorted(cat_dict.keys(), key=version_key):
-        filenames = sorted({fp.split("/")[-1] for fp in cat_dict[version]})
-        by_version[version] = filenames
-
-    parts = []
-    for version, filenames in by_version.items():
-        if len(filenames) <= 2:
-            source = ", ".join(filenames)
+        if use_full_path:
+            sources = sorted(cat_dict[version])
         else:
-            source = f"{len(filenames)} workflows"
-        parts.append(f"{version} [dim]({source})[/dim]")
+            sources = sorted({fp.split("/")[-1] for fp in cat_dict[version]})
+        by_version[version] = sources
+
+    multiple_versions = len(by_version) > 1
+    parts = []
+    for version, sources in by_version.items():
+        source_str = f"{len(sources)} files" if len(sources) > 2 else ", ".join(sources)
+        prefix = "[yellow]⚡[/yellow] " if multiple_versions else ""
+        parts.append(f"{prefix}{version} [dim]({source_str})[/dim]")
     return "\n".join(parts)
 
 
@@ -220,15 +257,16 @@ def display_results(all_repo_results: list[tuple[str, dict]]) -> None:
             return "[green]✓[/green]"
         return "—"
 
-    def _add_row(name, results):
-        detail.add_row(
-            name,
-            _fmt(results[VersionCategory.RUNTIME]),
-            _fmt(results[VersionCategory.MINIMUM]),
-            _fmt(results[VersionCategory.CI]),
-            _status(results),
-        )
+    def _add_row(name, results, continuation="│"):
+        runtime = _fmt(results[VersionCategory.RUNTIME])
+        minimum = _fmt(results[VersionCategory.MINIMUM])
+        ci = _fmt(results[VersionCategory.CI])
+        max_lines = max(col.count("\n") + 1 for col in (runtime, minimum, ci))
+        if max_lines > 1:
+            name = "\n".join([name] + [f"[dim]{continuation}[/dim]"] * (max_lines - 1))
+        detail.add_row(name, runtime, minimum, ci, _status(results))
 
+    first_row = True
     for repo_name, projects in sorted(all_repo_results, key=lambda x: x[0]):
         if not projects:
             continue
@@ -238,19 +276,30 @@ def display_results(all_repo_results: list[tuple[str, dict]]) -> None:
         if not sub_keys:
             # Single-project repo
             if root and any(root[cat] for cat in VersionCategory):
+                if not first_row:
+                    detail.add_section()
+                first_row = False
                 _add_row(repo_name, root)
         else:
-            # Monorepo — show repo name as header with root data (if any)
+            # Monorepo — show repo name as header with root data (if any).
+            # Use "  │" so continuation aligns with the children's "  ├──" at position 2.
+            if not first_row:
+                detail.add_section()
+            first_row = False
             if root and any(root[cat] for cat in VersionCategory):
-                _add_row(f"[bold]{repo_name}[/bold]", root)
+                _add_row(f"[bold]{repo_name}[/bold]", root, "  │")
             else:
                 detail.add_row(f"[bold]{repo_name}[/bold]", "", "", "", "")
 
             for i, key in enumerate(sub_keys):
-                prefix = "└── " if i == len(sub_keys) - 1 else "├── "
+                is_last = i == len(sub_keys) - 1
+                prefix = "└── " if is_last else "├── "
+                # Continuation aligns with "  ├──" (│ at position 2) for non-last,
+                # and uses spaces for the last child (└── has no │ below it).
+                continuation = "   " if is_last else "  │"
                 results = projects[key]
                 if any(results[cat] for cat in VersionCategory):
-                    _add_row(f"  {prefix}{key}", results)
+                    _add_row(f"  {prefix}{key}", results, continuation)
 
     console.print(detail)
     console.print()
@@ -324,14 +373,24 @@ def find_python_version(
         Include non-Python repos in the scan:
             gh-inspector find-python-version my-org --all-repositories
     """
-    gh_client = GitHubClient()
+    gh_client = GitHubClient(console=console)
     file_patterns = file_types if file_types else FILE_PATTERNS
-    repos = gh_client.get_repos(org_name, all_repositories)
+    repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
     all_repo_results = []
+    found_count = 0
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_repo, gh_client, repo, file_patterns): repo for repo in repos}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing Repos"):
-            all_repo_results.append(future.result())
+    for repo, projects, update in scan_repos(
+        repos,
+        lambda r: process_repo(gh_client, r, file_patterns)[1],
+        "Scanning repos",
+        "with versions",
+        gh_client,
+        console,
+    ):
+        repo_name = repo["nameWithOwner"]
+        all_repo_results.append((repo_name, projects))
+        if projects and any(projects[p][cat] for p in projects for cat in VersionCategory):
+            found_count += 1
+        update(found_count)
 
     display_results(all_repo_results)

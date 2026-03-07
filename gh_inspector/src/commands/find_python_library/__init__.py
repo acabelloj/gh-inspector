@@ -7,17 +7,17 @@ from github_client import GitHubClient
 from packaging.version import parse as parse_version
 from rich.console import Console
 from rich.table import Table
-from tqdm import tqdm
+from scanner import scan_repos
 
 from .parsers import PARSERS, matches_pattern
 
 console = Console()
 
-MAX_WORKERS = 6
+FILE_WORKERS = 3
 
 
-def get_matching_files(gh_client, repo_name, file_types):
-    tree = gh_client.get_repo_tree(repo_name)
+def get_matching_files(gh_client, repo_name, file_types, branch=None):
+    tree = gh_client.get_repo_tree(repo_name, branch)
     results = []
     for entry in tree:
         path = entry["path"]
@@ -38,19 +38,26 @@ def process_file(gh_client, repo_name, file_path, parser, libraries):
         for lib_name, version in parser.extract(content, libraries).items():
             results[f"{lib_name}$v{version}"].append(f"{repo_name} ({file_path})")
     except Exception as e:
-        print(f"Error processing {file_path} in {repo_name}: {e}")
+        console.print(f"[red]Error processing {file_path} in {repo_name}: {e}[/red]")
     return results
 
 
 def process_repo(gh_client, repo, libraries, file_types):
     repo_name = repo["nameWithOwner"]
+    branch = (repo.get("defaultBranchRef") or {}).get("name") or None
     all_results = defaultdict(list)
     try:
-        for file_path, parser in get_matching_files(gh_client, repo_name, file_types):
-            for key, values in process_file(gh_client, repo_name, file_path, parser, libraries).items():
-                all_results[key].extend(values)
+        matching = get_matching_files(gh_client, repo_name, file_types, branch)
+        with ThreadPoolExecutor(max_workers=FILE_WORKERS) as file_executor:
+            futures = {
+                file_executor.submit(process_file, gh_client, repo_name, fp, parser, libraries): fp
+                for fp, parser in matching
+            }
+            for future in as_completed(futures):
+                for key, values in future.result().items():
+                    all_results[key].extend(values)
     except Exception as e:
-        print(f"Error processing {repo_name}: {e}")
+        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
     return all_results
 
 
@@ -139,16 +146,24 @@ def find_python_library(
         Include non-Python repos in the scan:
             gh-inspector find-python-library my-org requests --all-repositories
     """
-    gh_client = GitHubClient()
+    gh_client = GitHubClient(console=console)
 
-    repos = gh_client.get_repos(org_name, all_repositories)
+    repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
     library_versions = defaultdict(list)
+    found_repos: set[str] = set()
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_repo, gh_client, repo, libraries, file_types): repo for repo in repos}
-
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing repos"):
-            for version, repo_files in future.result().items():
-                library_versions[version].extend(repo_files)
+    for repo, result, update in scan_repos(
+        repos,
+        lambda r: process_repo(gh_client, r, libraries, file_types),
+        "Scanning repos",
+        "with matches",
+        gh_client,
+        console,
+    ):
+        for version, repo_files in result.items():
+            library_versions[version].extend(repo_files)
+        if result:
+            found_repos.add(repo["nameWithOwner"])
+        update(len(found_repos))
 
     print_results(library_versions.items(), libraries, output_format)
