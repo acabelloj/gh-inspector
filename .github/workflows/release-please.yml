@@ -6,8 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
@@ -30,15 +29,40 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      attestations: write
+      id-token: write
     steps:
+      - uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # v2.15.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Check uv.lock for private index URLs
+        run: |
+          if grep -E 'url = "https?://' uv.lock | grep -Ev 'files\.pythonhosted\.org|pypi\.org'; then
+            echo "ERROR: uv.lock contains URLs from a non-public index. Remove private registry configuration and regenerate the lockfile."
+            exit 1
+          fi
 
       - uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
 
       - name: Build package
         run: uvx hatch==1.16.5 build
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        with:
+          subject-path: dist/*
 
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
@@ -52,6 +76,16 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # v2.15.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+            upload.pypi.org:443
+            pypi.org:443
+
       - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
         with:
           name: dist

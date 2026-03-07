@@ -12,9 +12,41 @@ permissions:
   contents: read
 
 jobs:
-  lint-and-test:
+  secret-scan:
     runs-on: ubuntu-latest
     steps:
+      - uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # v2.15.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint-and-test:
+    needs: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # v2.15.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4
 
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
@@ -23,6 +55,13 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
+
+      - name: Check uv.lock for private index URLs
+        run: |
+          if grep -E 'url = "https?://' uv.lock | grep -Ev 'files\.pythonhosted\.org|pypi\.org'; then
+            echo "ERROR: uv.lock contains URLs from a non-public index. Remove private registry configuration and regenerate the lockfile."
+            exit 1
+          fi
 
       - name: Install dependencies
         run: uv sync --extra dev
