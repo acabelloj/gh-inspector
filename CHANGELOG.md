@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.3.0...gh-inspector-v0.3.1) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** add sigstore endpoints to build allowlist and uv.lock pre-commit hook ([#35](https://github.com/acabelloj/gh-inspector/issues/35)) ([7432d2c](https://github.com/acabelloj/gh-inspector/commit/7432d2cc35e3ba06fabcaf9fb3c25d4f40dd3c6e))
+
 ## [0.3.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.2...gh-inspector-v0.3.0) (2026-03-07)
 
 
