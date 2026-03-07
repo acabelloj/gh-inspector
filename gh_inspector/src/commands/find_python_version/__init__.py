@@ -257,15 +257,16 @@ def display_results(all_repo_results: list[tuple[str, dict]]) -> None:
             return "[green]✓[/green]"
         return "—"
 
-    def _add_row(name, results):
+    def _add_row(name, results, continuation="│"):
         runtime = _fmt(results[VersionCategory.RUNTIME])
         minimum = _fmt(results[VersionCategory.MINIMUM])
         ci = _fmt(results[VersionCategory.CI])
         max_lines = max(col.count("\n") + 1 for col in (runtime, minimum, ci))
         if max_lines > 1:
-            name = "\n".join([name] + ["[dim]│[/dim]"] * (max_lines - 1))
+            name = "\n".join([name] + [f"[dim]{continuation}[/dim]"] * (max_lines - 1))
         detail.add_row(name, runtime, minimum, ci, _status(results))
 
+    first_row = True
     for repo_name, projects in sorted(all_repo_results, key=lambda x: x[0]):
         if not projects:
             continue
@@ -275,19 +276,30 @@ def display_results(all_repo_results: list[tuple[str, dict]]) -> None:
         if not sub_keys:
             # Single-project repo
             if root and any(root[cat] for cat in VersionCategory):
+                if not first_row:
+                    detail.add_section()
+                first_row = False
                 _add_row(repo_name, root)
         else:
-            # Monorepo — show repo name as header with root data (if any)
+            # Monorepo — show repo name as header with root data (if any).
+            # Use "  │" so continuation aligns with the children's "  ├──" at position 2.
+            if not first_row:
+                detail.add_section()
+            first_row = False
             if root and any(root[cat] for cat in VersionCategory):
-                _add_row(f"[bold]{repo_name}[/bold]", root)
+                _add_row(f"[bold]{repo_name}[/bold]", root, "  │")
             else:
                 detail.add_row(f"[bold]{repo_name}[/bold]", "", "", "", "")
 
             for i, key in enumerate(sub_keys):
-                prefix = "└── " if i == len(sub_keys) - 1 else "├── "
+                is_last = i == len(sub_keys) - 1
+                prefix = "└── " if is_last else "├── "
+                # Continuation aligns with "  ├──" (│ at position 2) for non-last,
+                # and uses spaces for the last child (└── has no │ below it).
+                continuation = "   " if is_last else "  │"
                 results = projects[key]
                 if any(results[cat] for cat in VersionCategory):
-                    _add_row(f"  {prefix}{key}", results)
+                    _add_row(f"  {prefix}{key}", results, continuation)
 
     console.print(detail)
     console.print()
