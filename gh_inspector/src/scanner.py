@@ -60,20 +60,37 @@ def scan_repos(
         console=console,
     ) as progress:
         task = progress.add_task("", total=len(repos), active=0, found=0, calls=0)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(_run, repo): repo for repo in repos}
-            for future in as_completed(futures):
-                repo = futures[future]
-                result = future.result()
+
+        # Heartbeat: refresh call count and active count while threads are sleeping
+        # (e.g. during rate-limit waits), not just when futures complete.
+        _stop = threading.Event()
+
+        def _heartbeat() -> None:
+            while not _stop.wait(timeout=0.5):
                 with lock:
                     active = len(in_progress)
+                progress.update(task, active=active, calls=gh_client.call_count)
 
-                def make_update(p: Progress, t: Any, a: int) -> Callable[[int], None]:
-                    def update(found_count: int) -> None:
-                        p.update(t, advance=1, active=a, found=found_count, calls=gh_client.call_count)
+        hb = threading.Thread(target=_heartbeat, daemon=True)
+        hb.start()
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(_run, repo): repo for repo in repos}
+                for future in as_completed(futures):
+                    repo = futures[future]
+                    result = future.result()
+                    with lock:
+                        active = len(in_progress)
 
-                    return update
+                    def make_update(p: Progress, t: Any, a: int) -> Callable[[int], None]:
+                        def update(found_count: int) -> None:
+                            p.update(t, advance=1, active=a, found=found_count, calls=gh_client.call_count)
 
-                yield repo, result, make_update(progress, task, active)
+                        return update
+
+                    yield repo, result, make_update(progress, task, active)
+        finally:
+            _stop.set()
+            hb.join()
 
     console.print(f"[dim]Total GitHub API calls: {gh_client.call_count}[/dim]\n")
