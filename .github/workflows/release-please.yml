@@ -42,6 +42,9 @@ jobs:
             release-assets.githubusercontent.com:443
             pypi.org:443
             files.pythonhosted.org:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4
         with:
