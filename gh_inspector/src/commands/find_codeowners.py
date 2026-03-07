@@ -1,25 +1,13 @@
-import threading
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 from rich.table import Table
 from rich.tree import Tree
+from scanner import scan_repos
 
 console = Console()
-
-MAX_WORKERS = 6
 
 CODEOWNERS_PATHS = [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"]
 
@@ -69,7 +57,7 @@ def process_repo(gh_client: GitHubClient, repo: dict) -> tuple[str, list[tuple[s
         entries = parse_codeowners(content)
         return (repo_name, entries)
     except Exception as e:
-        print(f"Error processing {repo_name}: {e}")
+        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
         return None
 
 
@@ -179,49 +167,25 @@ def find_codeowners(
         Hide repos without CODEOWNERS:
             gh-inspector find-codeowners my-org --skip-missing
     """
-    gh_client = GitHubClient()
+    gh_client = GitHubClient(console=console)
     repos = gh_client.get_repos(org_name, not python_only, extra_fields=["defaultBranchRef"])
 
     found: list[tuple[str, list[tuple[str, list[str]]]]] = []
     missing: list[str] = []
-    in_progress: set[str] = set()
-    lock = threading.Lock()
 
-    def _run(repo):
-        short = repo["nameWithOwner"].split("/")[-1]
-        with lock:
-            in_progress.add(short)
-        try:
-            return process_repo(gh_client, repo)
-        finally:
-            with lock:
-                in_progress.discard(short)
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold cyan]Scanning repos[/bold cyan]"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TextColumn("•"),
-        TimeElapsedColumn(),
-        TextColumn("•"),
-        TimeRemainingColumn(),
-        TextColumn("• [dim]{task.fields[active]} active[/dim]"),
-        TextColumn("• [green]✓ {task.fields[found]} with CODEOWNERS[/green]"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("", total=len(repos), active=0, found=0)
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {executor.submit(_run, repo): repo for repo in repos}
-            for future in as_completed(futures):
-                result = future.result()
-                if result is None:
-                    missing.append(futures[future]["nameWithOwner"])
-                else:
-                    found.append(result)
-                with lock:
-                    active = len(in_progress)
-                progress.update(task, advance=1, active=active, found=len(found))
+    for repo, result, update in scan_repos(
+        repos,
+        lambda r: process_repo(gh_client, r),
+        "Scanning repos",
+        "with CODEOWNERS",
+        gh_client,
+        console,
+    ):
+        if result is None:
+            missing.append(repo["nameWithOwner"])
+        else:
+            found.append(result)
+        update(len(found))
 
     if output_format == "only_repo":
         display_repo_table([repo for repo, _ in found])

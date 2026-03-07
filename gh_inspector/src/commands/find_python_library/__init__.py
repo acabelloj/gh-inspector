@@ -1,5 +1,4 @@
 import fnmatch
-import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -7,22 +6,13 @@ import typer
 from github_client import GitHubClient
 from packaging.version import parse as parse_version
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 from rich.table import Table
+from scanner import scan_repos
 
 from .parsers import PARSERS, matches_pattern
 
 console = Console()
 
-MAX_WORKERS = 6
 FILE_WORKERS = 3
 
 
@@ -48,7 +38,7 @@ def process_file(gh_client, repo_name, file_path, parser, libraries):
         for lib_name, version in parser.extract(content, libraries).items():
             results[f"{lib_name}$v{version}"].append(f"{repo_name} ({file_path})")
     except Exception as e:
-        print(f"Error processing {file_path} in {repo_name}: {e}")
+        console.print(f"[red]Error processing {file_path} in {repo_name}: {e}[/red]")
     return results
 
 
@@ -67,7 +57,7 @@ def process_repo(gh_client, repo, libraries, file_types):
                 for key, values in future.result().items():
                     all_results[key].extend(values)
     except Exception as e:
-        print(f"Error processing {repo_name}: {e}")
+        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
     return all_results
 
 
@@ -156,48 +146,24 @@ def find_python_library(
         Include non-Python repos in the scan:
             gh-inspector find-python-library my-org requests --all-repositories
     """
-    gh_client = GitHubClient()
+    gh_client = GitHubClient(console=console)
 
     repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
     library_versions = defaultdict(list)
     found_repos: set[str] = set()
-    in_progress: set[str] = set()
-    lock = threading.Lock()
 
-    def _run(repo):
-        short = repo["nameWithOwner"].split("/")[-1]
-        with lock:
-            in_progress.add(short)
-        try:
-            return repo["nameWithOwner"], process_repo(gh_client, repo, libraries, file_types)
-        finally:
-            with lock:
-                in_progress.discard(short)
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold cyan]Scanning repos[/bold cyan]"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TextColumn("•"),
-        TimeElapsedColumn(),
-        TextColumn("•"),
-        TimeRemainingColumn(),
-        TextColumn("• [dim]{task.fields[active]} active[/dim]"),
-        TextColumn("• [green]✓ {task.fields[found]} with matches[/green]"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("", total=len(repos), active=0, found=0)
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {executor.submit(_run, repo): repo for repo in repos}
-            for future in as_completed(futures):
-                repo_name, result = future.result()
-                for version, repo_files in result.items():
-                    library_versions[version].extend(repo_files)
-                if result:
-                    found_repos.add(repo_name)
-                with lock:
-                    active = len(in_progress)
-                progress.update(task, advance=1, active=active, found=len(found_repos))
+    for repo, result, update in scan_repos(
+        repos,
+        lambda r: process_repo(gh_client, r, libraries, file_types),
+        "Scanning repos",
+        "with matches",
+        gh_client,
+        console,
+    ):
+        for version, repo_files in result.items():
+            library_versions[version].extend(repo_files)
+        if result:
+            found_repos.add(repo["nameWithOwner"])
+        update(len(found_repos))
 
     print_results(library_versions.items(), libraries, output_format)

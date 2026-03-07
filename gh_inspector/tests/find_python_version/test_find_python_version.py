@@ -1,4 +1,5 @@
 from commands.find_python_version import (
+    _find_project_roots,
     _project_key,
     check_consistency,
     extract_versions_for_file,
@@ -126,24 +127,80 @@ class TestCheckConsistency:
         assert len(issues) == 1
 
 
-class TestProjectKey:
-    def test_root_file(self):
-        assert _project_key("pyproject.toml") == ""
+class TestFindProjectRoots:
+    def _tree(self, paths):
+        return [{"path": p} for p in paths]
 
-    def test_github_actions(self):
-        assert _project_key(".github/workflows/ci.yml") == ""
-
-    def test_circleci(self):
-        assert _project_key(".circleci/config.yml") == ""
+    def test_root_pyproject(self):
+        assert _find_project_roots(self._tree(["pyproject.toml", "src/main.py"])) == {""}
 
     def test_subproject(self):
-        assert _project_key("service-a/pyproject.toml") == "service-a"
+        assert _find_project_roots(self._tree(["apps/app1/pyproject.toml"])) == {"apps/app1"}
+
+    def test_multiple_subprojects(self):
+        roots = _find_project_roots(self._tree(["apps/app1/pyproject.toml", "libs/lib1/setup.py"]))
+        assert roots == {"apps/app1", "libs/lib1"}
+
+    def test_no_markers(self):
+        assert _find_project_roots(self._tree(["Dockerfile", ".github/workflows/ci.yml"])) == set()
+
+    def test_setup_py_and_cfg(self):
+        roots = _find_project_roots(self._tree(["svc/setup.py", "svc/setup.cfg"]))
+        assert roots == {"svc"}
+
+    def test_pulumi_base_file(self):
+        assert _find_project_roots(self._tree(["infra/Pulumi.yaml"])) == {"infra"}
+
+    def test_pulumi_nested(self):
+        roots = _find_project_roots(self._tree(["infra/env/Pulumi.yaml", "infra/env/Pulumi.prod.yml"]))
+        assert roots == {"infra/env"}
+
+    def test_pulumi_multiple_envs(self):
+        roots = _find_project_roots(self._tree(["infra/dev/Pulumi.yaml", "infra/prod/Pulumi.yaml"]))
+        assert roots == {"infra/dev", "infra/prod"}
+
+    def test_pulumi_stack_only(self):
+        # Directory with only a stack file (no base Pulumi.yaml) is still a project root
+        roots = _find_project_roots(self._tree(["infra/env/Pulumi.prod.yml", "infra/env/.python-version"]))
+        assert roots == {"infra/env"}
+
+    def test_pulumi_stack_variants(self):
+        roots = _find_project_roots(self._tree(["infra/Pulumi.staging.yaml", "infra/Pulumi.prod.yml"]))
+        assert roots == {"infra"}
+
+
+class TestProjectKey:
+    def test_root_file(self):
+        assert _project_key("pyproject.toml", {""}) == ""
+
+    def test_github_actions(self):
+        assert _project_key(".github/workflows/ci.yml", {""}) == ""
+
+    def test_circleci(self):
+        assert _project_key(".circleci/config.yml", {""}) == ""
+
+    def test_subproject(self):
+        assert _project_key("service-a/pyproject.toml", {"service-a"}) == "service-a"
 
     def test_nested_subproject(self):
-        assert _project_key("service-a/backend/Dockerfile") == "service-a"
+        assert _project_key("service-a/backend/Dockerfile", {"service-a"}) == "service-a"
 
     def test_root_dockerfile(self):
-        assert _project_key("Dockerfile") == ""
+        assert _project_key("Dockerfile", {""}) == ""
+
+    def test_deep_monorepo(self):
+        roots = {"apps/app1", "apps/app2", "libs/lib1"}
+        assert _project_key("apps/app1/.python-version", roots) == "apps/app1"
+        assert _project_key("apps/app2/Dockerfile", roots) == "apps/app2"
+        assert _project_key("libs/lib1/pyproject.toml", roots) == "libs/lib1"
+
+    def test_no_roots_falls_back_to_first_dir(self):
+        assert _project_key("apps/app1/Dockerfile", set()) == "apps"
+
+    def test_deepest_root_wins(self):
+        # if both "apps" and "apps/app1" are roots, "apps/app1" wins for a file inside it
+        roots = {"apps", "apps/app1"}
+        assert _project_key("apps/app1/Dockerfile", roots) == "apps/app1"
 
 
 class TestVersionKey:
