@@ -97,6 +97,34 @@ class TestExtractVersionsForFile:
         content = "      - image: python:3.12-slim"
         assert extract_versions_for_file(".circleci/config.yml", content) == [("3.12", VersionCategory.CI)]
 
+    def test_pulumi_runtime_inline(self):
+        # "runtime: python3.11" — version embedded in runtime value
+        content = "runtime: python3.11"
+        assert extract_versions_for_file("infra/Pulumi.yaml", content) == [("3.11", VersionCategory.RUNTIME)]
+
+    def test_pulumi_runtime_patch(self):
+        content = "runtime: python3.11.5"
+        assert extract_versions_for_file("Pulumi.yaml", content) == [("3.11.5", VersionCategory.RUNTIME)]
+
+    def test_pulumi_runtime_version_key(self):
+        # Newer Pulumi format with separate runtimeVersion key
+        content = "runtime: python\nruntimeVersion: 3.11"
+        result = extract_versions_for_file("Pulumi.yaml", content)
+        assert ("3.11", VersionCategory.RUNTIME) in result
+
+    def test_pulumi_python_version_key(self):
+        content = "python-version: 3.12.1"
+        assert extract_versions_for_file("Pulumi.yaml", content) == [("3.12.1", VersionCategory.RUNTIME)]
+
+    def test_pulumi_stack_file_nested(self):
+        # Stack file in infra/envs/ should still be detected
+        content = "runtime: python3.11"
+        assert extract_versions_for_file("infra/envs/Pulumi.prod.yaml", content) == [("3.11", VersionCategory.RUNTIME)]
+
+    def test_pulumi_no_version(self):
+        content = "runtime: nodejs\nname: my-stack"
+        assert extract_versions_for_file("Pulumi.yaml", content) == []
+
     def test_unknown_file(self):
         assert extract_versions_for_file("some_other_file.txt", "python = '3.11'") == []
 
