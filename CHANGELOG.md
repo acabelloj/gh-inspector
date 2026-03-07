@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.2...gh-inspector-v0.3.0) (2026-03-07)
+
+
+### Features
+
+* add --version flag to CLI ([#10](https://github.com/acabelloj/gh-inspector/issues/10)) ([a7df24e](https://github.com/acabelloj/gh-inspector/commit/a7df24e1f9f992a7069d8d42d5b001d097de020f))
+* add CI/CD pipeline, tests, Makefile, docs, and bug fixes ([#2](https://github.com/acabelloj/gh-inspector/issues/2)) ([70cb053](https://github.com/acabelloj/gh-inspector/commit/70cb0539ebc9940b4b8638b3752e46da30c60ab0))
+* add find-codeowners command ([#28](https://github.com/acabelloj/gh-inspector/issues/28)) ([5221389](https://github.com/acabelloj/gh-inspector/commit/5221389f05a8250e305f14e7811243676320405c))
+* add find-licenses command ([#29](https://github.com/acabelloj/gh-inspector/issues/29)) ([d6babfe](https://github.com/acabelloj/gh-inspector/commit/d6babfe24a8349362ae5b4b509342c35e495f56c))
+* modularize find-python-library with multi-format parser support ([#13](https://github.com/acabelloj/gh-inspector/issues/13)) ([f7335ad](https://github.com/acabelloj/gh-inspector/commit/f7335ad160adff525cc52729a825fd66116ff20e))
+
+
+### Bug Fixes
+
+* add Python version classifiers and pin to 3.14 ([#6](https://github.com/acabelloj/gh-inspector/issues/6)) ([a896c51](https://github.com/acabelloj/gh-inspector/commit/a896c5150c1de9ef10e86a37b34a573628e29bae))
+* **ci:** add release-assets.githubusercontent.com to secret-scan allowlist ([#34](https://github.com/acabelloj/gh-inspector/issues/34)) ([6611a76](https://github.com/acabelloj/gh-inspector/commit/6611a7670c6e73e32be0ad111bfd7ef964e94123))
+* handle timeout=0 correctly in GitHubClient ([#24](https://github.com/acabelloj/gh-inspector/issues/24)) ([8dd0699](https://github.com/acabelloj/gh-inspector/commit/8dd0699681e1da064e1d38a242868b3fda2a0c86))
+* trigger PyPI publish from release-please workflow ([#14](https://github.com/acabelloj/gh-inspector/issues/14)) ([9049126](https://github.com/acabelloj/gh-inspector/commit/904912634601aa6d3d62b3e35e6df01b2b86f249))
+* update e2e expected Python version to 3.14 ([#8](https://github.com/acabelloj/gh-inspector/issues/8)) ([0db1b6e](https://github.com/acabelloj/gh-inspector/commit/0db1b6ed2e684ec5a19cf358bb35a6e4b723f844))
+* use commit SHA for pypa/gh-action-pypi-publish ([#9](https://github.com/acabelloj/gh-inspector/issues/9)) ([0dc20ca](https://github.com/acabelloj/gh-inspector/commit/0dc20ca98b00f37c7bd268435497e9523692a8d9))
+
+
+### Documentation
+
+* improve CLI help text with examples and accepted values ([#26](https://github.com/acabelloj/gh-inspector/issues/26)) ([f87610b](https://github.com/acabelloj/gh-inspector/commit/f87610bead9f8181933e733b87dcefa72c68d553))
+
 ## [0.2.2](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.2.1...gh-inspector-v0.2.2) (2026-03-05)
 
 
