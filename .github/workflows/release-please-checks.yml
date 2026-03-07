@@ -1,0 +1,32 @@
+name: Release Please Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CHANGELOG.md
+      - pyproject.toml
+      - .release-please-manifest.json
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    if: startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Skipping commitlint for release-please PR"
+
+  lint-and-test:
+    if: startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Skipping lint-and-test for release-please PR"
+
+  e2e:
+    if: startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Skipping e2e for release-please PR"
