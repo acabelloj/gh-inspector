@@ -1,44 +1,37 @@
 import base64
 import json
 import subprocess
+import threading
+import time
 from typing import Any
+
+_MAX_CONCURRENT_REQUESTS = 8
+_RATE_LIMIT_RETRY_DELAYS = [10, 30, 60]
 
 
 class GitHubClient:
     """Client for interacting with GitHub CLI commands."""
 
     def __init__(self, timeout: int = 30):
-        """
-        Initialize the GitHub client.
-
-        Args:
-            timeout: Default timeout for commands in seconds
-        """
         self.timeout = timeout
+        self._semaphore = threading.Semaphore(_MAX_CONCURRENT_REQUESTS)
 
     def run_command(self, args: list[str], timeout: int = None) -> str:
-        """
-        Execute a GitHub CLI command.
-
-        Args:
-            args: The command and arguments as a list
-            timeout: Optional timeout override for this command
-
-        Returns:
-            The command output as a string
-
-        Raises:
-            Exception: If the command fails or times out
-        """
         timeout = self.timeout if timeout is None else timeout
-        try:
-            result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
-            if result.returncode == 0:
-                return result.stdout.strip()
-            else:
-                raise Exception(f"Error executing command '{' '.join(args)}': {result.stderr}")
-        except subprocess.TimeoutExpired as e:
-            raise Exception(f"Command '{' '.join(args)}' timed out after {timeout} seconds") from e
+        for attempt, retry_delay in enumerate([None] + _RATE_LIMIT_RETRY_DELAYS):
+            if retry_delay is not None:
+                time.sleep(retry_delay)
+            with self._semaphore:
+                try:
+                    result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+                except subprocess.TimeoutExpired as e:
+                    raise Exception(f"Command '{' '.join(args)}' timed out after {timeout} seconds") from e
+                if result.returncode == 0:
+                    return result.stdout.strip()
+                is_rate_limited = "rate limit" in result.stderr.lower()
+                if not is_rate_limited or attempt == len(_RATE_LIMIT_RETRY_DELAYS):
+                    raise Exception(f"Error executing command '{' '.join(args)}': {result.stderr}")
+        raise Exception(f"Rate limit exceeded after retries for: {' '.join(args)}")
 
     def get_repos(
         self, org_name: str, all_repositories: bool = False, extra_fields: list[str] | None = None

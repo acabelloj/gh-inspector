@@ -1,4 +1,5 @@
 import re
+import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -8,14 +9,23 @@ from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion
 from packaging.version import parse as parse_version
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
-from tqdm import tqdm
 
 from .extractors import EXTRACTORS, VersionCategory
 
 console = Console()
 
 MAX_WORKERS = 6
+FILE_WORKERS = 3
 
 FILE_PATTERNS = [pattern for ext in EXTRACTORS for pattern in ext.FILE_PATTERNS]
 
@@ -41,9 +51,9 @@ def extract_versions_for_file(file_path: str, content: str) -> list[tuple[str, V
     return [(v, extractor.CATEGORY) for v in extractor.extract(content)]
 
 
-def get_files(gh_client, repo_name, file_patterns):
+def get_files(gh_client, repo_name, file_patterns, branch=None):
     try:
-        tree = gh_client.get_repo_tree(repo_name)
+        tree = gh_client.get_repo_tree(repo_name, branch)
         matched = []
         for file in tree:
             path = file["path"]
@@ -71,18 +81,23 @@ def _project_key(file_path: str) -> str:
 
 def process_repo(gh_client, repo, file_patterns):
     repo_name = repo["nameWithOwner"]
+    branch = (repo.get("defaultBranchRef") or {}).get("name") or None
     projects: dict[str, dict[VersionCategory, dict[str, set[str]]]] = defaultdict(
         lambda: {cat: defaultdict(set) for cat in VersionCategory}
     )
     try:
-        for file in get_files(gh_client, repo_name, file_patterns):
-            try:
-                content = gh_client.get_file_content(repo_name, file)
-                project = _project_key(file)
-                for version, category in extract_versions_for_file(file, content):
-                    projects[project][category][version].add(file)
-            except Exception as e:
-                print(f"Error processing {file} in {repo_name}: {e}")
+        files = get_files(gh_client, repo_name, file_patterns, branch)
+        with ThreadPoolExecutor(max_workers=FILE_WORKERS) as file_executor:
+            futures = {file_executor.submit(gh_client.get_file_content, repo_name, f): f for f in files}
+            for future in as_completed(futures):
+                file = futures[future]
+                try:
+                    content = future.result()
+                    project = _project_key(file)
+                    for version, category in extract_versions_for_file(file, content):
+                        projects[project][category][version].add(file)
+                except Exception as e:
+                    print(f"Error processing {file} in {repo_name}: {e}")
     except Exception as e:
         print(f"Error processing {repo_name}: {e}")
     return repo_name, dict(projects)
@@ -326,12 +341,45 @@ def find_python_version(
     """
     gh_client = GitHubClient()
     file_patterns = file_types if file_types else FILE_PATTERNS
-    repos = gh_client.get_repos(org_name, all_repositories)
+    repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
     all_repo_results = []
+    found_count = 0
+    in_progress: set[str] = set()
+    lock = threading.Lock()
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_repo, gh_client, repo, file_patterns): repo for repo in repos}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing Repos"):
-            all_repo_results.append(future.result())
+    def _run(repo):
+        short = repo["nameWithOwner"].split("/")[-1]
+        with lock:
+            in_progress.add(short)
+        try:
+            return process_repo(gh_client, repo, file_patterns)
+        finally:
+            with lock:
+                in_progress.discard(short)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold cyan]Scanning repos[/bold cyan]"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        TextColumn("•"),
+        TimeRemainingColumn(),
+        TextColumn("• [dim]{task.fields[active]} active[/dim]"),
+        TextColumn("• [green]✓ {task.fields[found]} with versions[/green]"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("", total=len(repos), active=0, found=0)
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {executor.submit(_run, repo): repo for repo in repos}
+            for future in as_completed(futures):
+                repo_name, projects = future.result()
+                all_repo_results.append((repo_name, projects))
+                if projects and any(projects[p][cat] for p in projects for cat in VersionCategory):
+                    found_count += 1
+                with lock:
+                    active = len(in_progress)
+                progress.update(task, advance=1, active=active, found=found_count)
 
     display_results(all_repo_results)

@@ -1,13 +1,22 @@
 import json
 import re
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
-from tqdm import tqdm
 
 console = Console()
 
@@ -221,12 +230,44 @@ def find_licenses(
     # try to find it in manifest files (pyproject.toml, setup.cfg, package.json, Cargo.toml).
     needs_fallback = [r for r in repos if extract_license_id(r) in (None, "other")]
     if needs_fallback:
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {executor.submit(_fetch_file_license, gh_client, r["nameWithOwner"]): r for r in needs_fallback}
-            for future in tqdm(as_completed(futures), total=len(futures), desc="Checking manifest files"):
-                repo_name, license_id = future.result()
-                if license_id:
-                    futures[future]["_resolved_license"] = license_id
+        resolved_count = 0
+        in_progress: set[str] = set()
+        lock = threading.Lock()
+
+        def _run(repo):
+            short = repo["nameWithOwner"].split("/")[-1]
+            with lock:
+                in_progress.add(short)
+            try:
+                return _fetch_file_license(gh_client, repo["nameWithOwner"])
+            finally:
+                with lock:
+                    in_progress.discard(short)
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]Checking manifest files[/bold cyan]"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TextColumn("•"),
+            TimeElapsedColumn(),
+            TextColumn("•"),
+            TimeRemainingColumn(),
+            TextColumn("• [dim]{task.fields[active]} active[/dim]"),
+            TextColumn("• [green]✓ {task.fields[found]} resolved[/green]"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("", total=len(needs_fallback), active=0, found=0)
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                futures = {executor.submit(_run, r): r for r in needs_fallback}
+                for future in as_completed(futures):
+                    repo_name, license_id = future.result()
+                    if license_id:
+                        futures[future]["_resolved_license"] = license_id
+                        resolved_count += 1
+                    with lock:
+                        active = len(in_progress)
+                    progress.update(task, advance=1, active=active, found=resolved_count)
 
     grouped, unlicensed = group_by_license(repos, exclude, skip_missing)
 

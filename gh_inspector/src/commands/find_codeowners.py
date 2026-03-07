@@ -1,12 +1,21 @@
+import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
 from rich.tree import Tree
-from tqdm import tqdm
 
 console = Console()
 
@@ -35,10 +44,10 @@ def parse_codeowners(content: str) -> list[tuple[str, list[str]]]:
     return entries
 
 
-def find_codeowners_file(gh_client: GitHubClient, repo_name: str) -> str | None:
+def find_codeowners_file(gh_client: GitHubClient, repo_name: str, branch: str | None = None) -> str | None:
     """Return the path of the first CODEOWNERS file found, or None."""
     try:
-        tree = gh_client.get_repo_tree(repo_name)
+        tree = gh_client.get_repo_tree(repo_name, branch)
     except Exception:
         return None
     paths = {entry["path"] for entry in tree}
@@ -51,8 +60,9 @@ def find_codeowners_file(gh_client: GitHubClient, repo_name: str) -> str | None:
 def process_repo(gh_client: GitHubClient, repo: dict) -> tuple[str, list[tuple[str, list[str]]]] | None:
     """Return (repo_name, parsed_entries) or None if no CODEOWNERS found."""
     repo_name = repo["nameWithOwner"]
+    branch = (repo.get("defaultBranchRef") or {}).get("name") or None
     try:
-        codeowners_path = find_codeowners_file(gh_client, repo_name)
+        codeowners_path = find_codeowners_file(gh_client, repo_name, branch)
         if codeowners_path is None:
             return None
         content = gh_client.get_file_content(repo_name, codeowners_path)
@@ -72,10 +82,7 @@ def aggregate_by_owner(
         for pattern, owners in entries:
             for owner in owners:
                 owner_map[owner][repo_name].append(pattern)
-    return {
-        owner: [(repo, patterns) for repo, patterns in sorted(repos.items())]
-        for owner, repos in sorted(owner_map.items())
-    }
+    return {owner: sorted(repos.items()) for owner, repos in sorted(owner_map.items())}
 
 
 MAX_PATTERNS_SHOWN = 5
@@ -173,19 +180,48 @@ def find_codeowners(
             gh-inspector find-codeowners my-org --skip-missing
     """
     gh_client = GitHubClient()
-    repos = gh_client.get_repos(org_name, not python_only)
+    repos = gh_client.get_repos(org_name, not python_only, extra_fields=["defaultBranchRef"])
 
     found: list[tuple[str, list[tuple[str, list[str]]]]] = []
     missing: list[str] = []
+    in_progress: set[str] = set()
+    lock = threading.Lock()
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(process_repo, gh_client, repo): repo for repo in repos}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing repos"):
-            result = future.result()
-            if result is None:
-                missing.append(futures[future]["nameWithOwner"])
-            else:
-                found.append(result)
+    def _run(repo):
+        short = repo["nameWithOwner"].split("/")[-1]
+        with lock:
+            in_progress.add(short)
+        try:
+            return process_repo(gh_client, repo)
+        finally:
+            with lock:
+                in_progress.discard(short)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold cyan]Scanning repos[/bold cyan]"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        TextColumn("•"),
+        TimeRemainingColumn(),
+        TextColumn("• [dim]{task.fields[active]} active[/dim]"),
+        TextColumn("• [green]✓ {task.fields[found]} with CODEOWNERS[/green]"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("", total=len(repos), active=0, found=0)
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {executor.submit(_run, repo): repo for repo in repos}
+            for future in as_completed(futures):
+                result = future.result()
+                if result is None:
+                    missing.append(futures[future]["nameWithOwner"])
+                else:
+                    found.append(result)
+                with lock:
+                    active = len(in_progress)
+                progress.update(task, advance=1, active=active, found=len(found))
 
     if output_format == "only_repo":
         display_repo_table([repo for repo, _ in found])
