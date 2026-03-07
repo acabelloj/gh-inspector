@@ -86,6 +86,7 @@ jobs:
             github.com:443
             api.github.com:443
             objects.githubusercontent.com:443
+            ghcr.io:443
             upload.pypi.org:443
             pypi.org:443
 
