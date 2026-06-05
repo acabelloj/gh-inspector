@@ -20,7 +20,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v4
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@0c0c5dc2f136b98cb0537075ccfa21f94cd9a63e  # codeql-bundle-v2.24.3
