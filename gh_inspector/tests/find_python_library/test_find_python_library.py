@@ -3,7 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from commands.find_python_library import get_matching_files, process_file
+from commands.find_python_library import build_library_versions, get_matching_files, process_file
 from commands.find_python_library.parsers import pipfile_lock as pipfile_parser
 from commands.find_python_library.parsers import poetry_lock as poetry_parser
 from commands.find_python_library.parsers import requirements as req_parser
@@ -11,6 +11,28 @@ from commands.find_python_library.parsers import setup_cfg as setup_cfg_parser
 from commands.find_python_library.parsers import uv_lock as uv_parser
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+class TestBuildLibraryVersions:
+    def test_default_view_groups_by_lib_and_version(self):
+        items = [
+            ("requests$v2.31.0", ["org/a (requirements.txt)"]),
+            ("requests$v2.28.0", ["org/b (uv.lock)"]),
+        ]
+        data = build_library_versions(items, "default")
+        assert data == {
+            "libraries": {
+                "requests": {
+                    "2.31.0": [{"repo": "org/a", "file": "requirements.txt"}],
+                    "2.28.0": [{"repo": "org/b", "file": "uv.lock"}],
+                }
+            }
+        }
+
+    def test_only_repo_view(self):
+        items = [("requests$v2.31.0", ["org/a (requirements.txt)", "org/b (uv.lock)"])]
+        data = build_library_versions(items, "only_repo")
+        assert data == {"repos": ["org/a", "org/b"]}
 
 
 class TestRequirementsParser:

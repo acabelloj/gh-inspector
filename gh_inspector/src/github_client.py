@@ -74,6 +74,11 @@ class GitHubClient:
     def call_count(self) -> int:
         return self._call_count
 
+    @property
+    def console(self):
+        """Console for progress/error output, routed to stderr in json mode."""
+        return self._console
+
     def _log_rate_limit(self, wait: int, attempt: int, total: int, context: str, from_gh: bool) -> None:
         if self._console is None:
             return

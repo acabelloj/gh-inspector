@@ -1,0 +1,43 @@
+# serializer version: 1
+# name: test_find_licenses_json
+  '''
+  {
+    "licenses": {
+      "Apache-2.0": [
+        "org/beta"
+      ],
+      "BSD-3-Clause": [
+        "org/delta"
+      ],
+      "MIT": [
+        "org/alpha",
+        "org/gamma"
+      ]
+    },
+    "unlicensed": []
+  }
+  
+  '''
+# ---
+# name: test_find_licenses_rich
+  '''
+  gh-inspector v0.4.1
+  
+    Checking manifest files ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 • 0:00:00 • 0:00:00 • 0 active • ✓ 1 resolved • 0 gh calls
+  Total GitHub API calls: 0
+  
+     Licenses by Repository    
+  ┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+  ┃ License      ┃ Repository ┃
+  ┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+  │ Apache-2.0   │ org/beta   │
+  ├──────────────┼────────────┤
+  │ BSD-3-Clause │ org/delta  │
+  ├──────────────┼────────────┤
+  │ MIT          │ org/alpha  │
+  │              │ org/gamma  │
+  └──────────────┴────────────┘
+  
+  
+  '''
+# ---

@@ -3,6 +3,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from commands.find_licenses import (
+    build_licenses,
     display_license_table,
     display_unlicensed_table,
     extract_license_id,
@@ -15,6 +16,16 @@ from commands.find_licenses import (
 )
 from github_client import GitHubClient
 from rich.console import Console
+
+
+class TestBuildLicenses:
+    def test_default_view(self):
+        data = build_licenses({"MIT": ["org/b", "org/a"]}, ["org/c"], "default")
+        assert data == {"licenses": {"MIT": ["org/a", "org/b"]}, "unlicensed": ["org/c"]}
+
+    def test_only_repo_view(self):
+        data = build_licenses({"MIT": ["org/b"], "BSD": ["org/a"]}, ["org/c"], "only_repo")
+        assert data == {"repos": ["org/a", "org/b"], "unlicensed": ["org/c"]}
 
 
 def _make_repo(name: str, license_key: str | None = None) -> dict:

@@ -7,6 +7,8 @@ from commands.find_codeowners import find_codeowners
 from commands.find_licenses import find_licenses
 from commands.find_python_library import find_python_library
 from commands.find_python_version import find_python_version
+from output import AppContext, OutputMode, OutputOption
+from rich.console import Console
 
 __version__ = version("gh-inspector")
 
@@ -35,16 +37,22 @@ def main(
     version: bool = typer.Option(
         None, "--version", "-v", callback=version_callback, is_eager=True, help="Show version and exit."
     ),
+    output: OutputOption = OutputMode.RICH,
 ):
     """
     gh-inspector - Inspect GitHub repositories without cloning.
 
     Run 'gh-inspector COMMAND --help' for more information on a command.
     """
+    ctx.obj = AppContext(
+        output=output,
+        stdout_console=Console(),
+        stderr_console=Console(stderr=True),
+        banner=f"gh-inspector v{__version__}\n",
+    )
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
-    typer.echo(f"gh-inspector v{__version__}\n")
 
 
 if __name__ == "__main__":

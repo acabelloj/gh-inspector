@@ -1,0 +1,99 @@
+# serializer version: 1
+# name: test_find_python_version_json
+  '''
+  {
+    "repos": [
+      {
+        "repo": "org/alpha",
+        "projects": {
+          "": {
+            "runtime": [
+              "3.12"
+            ],
+            "minimum": [
+              ">=3.10"
+            ],
+            "ci": [],
+            "status": "ok",
+            "issues": []
+          }
+        }
+      },
+      {
+        "repo": "org/beta",
+        "projects": {
+          "": {
+            "runtime": [
+              "3.9"
+            ],
+            "minimum": [
+              ">=3.11"
+            ],
+            "ci": [],
+            "status": "inconsistent",
+            "issues": [
+              "runtime 3.9 does not satisfy >=3.11"
+            ]
+          }
+        }
+      },
+      {
+        "repo": "org/gamma",
+        "projects": {}
+      }
+    ],
+    "runtime_distribution": {
+      "3.12": 1,
+      "3.9": 1
+    }
+  }
+  
+  '''
+# ---
+# name: test_find_python_version_rich
+  '''
+  gh-inspector v0.4.1
+  
+    Scanning repos ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3/3 • 0:00:00 • 0:00:00 • 0 active • ✓ 2 with versions • 0 gh calls
+  Total GitHub API calls: 0
+  
+  
+  Python Version Identification Dashboard
+  
+                             Runtime Version Distribution                            
+  ┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Python Version       ┃  Repos   ┃  Percentage  ┃                                ┃
+  ┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ 3.12                 │    1     │    50.0%     │ ██████████░░░░░░░░░░           │
+  ├──────────────────────┼──────────┼──────────────┼────────────────────────────────┤
+  │ 3.9                  │    1     │    50.0%     │ ██████████░░░░░░░░░░           │
+  └──────────────────────┴──────────┴──────────────┴────────────────────────────────┘
+  
+                              Python Versions per Repository                             
+  ┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━┳━━━━━━━━━━━━━━━━┓
+  ┃ Repository ┃ Runtime                ┃ Minimum                 ┃ CI ┃ Status         ┃
+  ┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━╇━━━━━━━━━━━━━━━━┩
+  │ org/alpha  │ 3.12 (.python-version) │ >=3.10 (pyproject.toml) │ —  │ ✓              │
+  ├────────────┼────────────────────────┼─────────────────────────┼────┼────────────────┤
+  │ org/beta   │ 3.9 (.python-version)  │ >=3.11 (pyproject.toml) │ —  │ ⚠ inconsistent │
+  └────────────┴────────────────────────┴─────────────────────────┴────┴────────────────┘
+  
+                    Inconsistencies                   
+  ┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Repository ┃ Issue                               ┃
+  ┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ org/beta   │ runtime 3.9 does not satisfy >=3.11 │
+  └────────────┴─────────────────────────────────────┘
+  
+   Repositories 
+  with No Python
+  Version Found 
+  ┏━━━━━━━━━━━━┓
+  ┃ Repository ┃
+  ┡━━━━━━━━━━━━┩
+  │ org/gamma  │
+  └────────────┘
+  
+  
+  '''
+# ---

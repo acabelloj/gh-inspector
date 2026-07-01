@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import typer
 from github_client import GitHubClient
+from output import OutputMode, OutputOption, emit, get_ctx, resolve_output
 from rich.console import Console
 from rich.table import Table
 from scanner import scan_repos
@@ -166,7 +167,42 @@ def display_unlicensed_table(repos: list[str]) -> None:
     console.print()
 
 
+def build_licenses(grouped: dict[str, list[str]], unlicensed: list[str], output_format: str) -> dict:
+    """Build JSON-serializable license data respecting the selected view."""
+    if output_format == "only_repo":
+        repos = sorted(name for names in grouped.values() for name in names)
+        return {"repos": repos, "unlicensed": sorted(unlicensed)}
+    return {
+        "licenses": {lic: sorted(grouped[lic]) for lic in sorted(grouped)},
+        "unlicensed": sorted(unlicensed),
+    }
+
+
+def _render_licenses(grouped: dict[str, list[str]], unlicensed: list[str], output_format: str) -> None:
+    """Render license results as Rich tables (the default view)."""
+    if output_format == "only_repo":
+        all_repo_names = sorted(name for names in grouped.values() for name in names)
+        if all_repo_names:
+            table = Table(title="Repositories with licenses", show_header=True, header_style="bold magenta")
+            table.add_column("Repository", style="cyan", no_wrap=False)
+            for repo in all_repo_names:
+                table.add_row(repo)
+            console.print(table)
+            console.print()
+        else:
+            console.print("[yellow]No repositories with non-excluded licenses found.[/yellow]\n")
+    else:
+        if grouped:
+            display_license_table(grouped)
+        else:
+            console.print("[yellow]No repositories with non-excluded licenses found.[/yellow]\n")
+
+    if unlicensed:
+        display_unlicensed_table(unlicensed)
+
+
 def find_licenses(
+    ctx: typer.Context,
     org_name: str = typer.Argument(..., help="GitHub organization name"),
     exclude: list[str] = typer.Option(
         None,
@@ -191,6 +227,7 @@ def find_licenses(
         "--skip-missing",
         help="Do not list repos without a detected license.",
     ),
+    output: OutputOption = OutputMode.RICH,
 ):
     """Find and display license usage across repositories of a GitHub organization.
 
@@ -211,7 +248,9 @@ def find_licenses(
         Hide repos without a detected license:
             gh-inspector find-licenses my-org --skip-missing
     """
-    gh_client = GitHubClient(console=console)
+    resolve_output(ctx, output)
+    scan_console = get_ctx(ctx).scan_console
+    gh_client = GitHubClient(console=scan_console)
     repos = gh_client.get_repos(org_name, not python_only, extra_fields=["licenseInfo"])
 
     # For repos where GitHub didn't detect a license or detected "other",
@@ -225,7 +264,7 @@ def find_licenses(
             "Checking manifest files",
             "resolved",
             gh_client,
-            console,
+            scan_console,
         ):
             if license_id:
                 repo["_resolved_license"] = license_id
@@ -234,22 +273,8 @@ def find_licenses(
 
     grouped, unlicensed = group_by_license(repos, exclude, skip_missing)
 
-    if output_format == "only_repo":
-        all_repo_names = sorted(name for names in grouped.values() for name in names)
-        if all_repo_names:
-            table = Table(title="Repositories with licenses", show_header=True, header_style="bold magenta")
-            table.add_column("Repository", style="cyan", no_wrap=False)
-            for repo in all_repo_names:
-                table.add_row(repo)
-            console.print(table)
-            console.print()
-        else:
-            console.print("[yellow]No repositories with non-excluded licenses found.[/yellow]\n")
-    else:
-        if grouped:
-            display_license_table(grouped)
-        else:
-            console.print("[yellow]No repositories with non-excluded licenses found.[/yellow]\n")
-
-    if unlicensed:
-        display_unlicensed_table(unlicensed)
+    emit(
+        ctx,
+        build_licenses(grouped, unlicensed, output_format),
+        lambda: _render_licenses(grouped, unlicensed, output_format),
+    )

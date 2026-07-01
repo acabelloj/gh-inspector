@@ -1,3 +1,4 @@
+import base64
 import json
 from unittest.mock import MagicMock, patch
 
@@ -44,8 +45,6 @@ class TestGitHubClient:
             assert self.client.get_default_branch("org/repo") == "main"
 
     def test_get_file_content(self):
-        import base64
-
         encoded = base64.b64encode(b"file content").decode()
         api_response = json.dumps({"content": encoded + "\n"})
         with patch.object(self.client, "run_command", return_value=api_response):
