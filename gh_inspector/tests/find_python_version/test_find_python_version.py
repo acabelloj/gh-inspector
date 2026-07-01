@@ -1,12 +1,45 @@
 from commands.find_python_version import (
     _find_project_roots,
     _project_key,
+    build_version_report,
     check_consistency,
     extract_versions_for_file,
     matches_pattern,
     version_key,
 )
 from commands.find_python_version.extractors import VersionCategory
+
+
+class TestBuildVersionReport:
+    def _projects(self, runtime, minimum, ci):
+        return {
+            "": {
+                VersionCategory.RUNTIME: {v: {"f"} for v in runtime},
+                VersionCategory.MINIMUM: {v: {"f"} for v in minimum},
+                VersionCategory.CI: {v: {"f"} for v in ci},
+            }
+        }
+
+    def test_ok_repo(self):
+        results = [("org/a", self._projects(["3.11"], [">=3.10"], ["3.11"]))]
+        data = build_version_report(results)
+        assert data["runtime_distribution"] == {"3.11": 1}
+        proj = data["repos"][0]["projects"][""]
+        assert proj["status"] == "ok"
+        assert proj["runtime"] == ["3.11"]
+        assert proj["issues"] == []
+
+    def test_inconsistent_repo(self):
+        results = [("org/a", self._projects(["3.9"], [">=3.11"], []))]
+        data = build_version_report(results)
+        proj = data["repos"][0]["projects"][""]
+        assert proj["status"] == "inconsistent"
+        assert proj["issues"]
+
+    def test_repo_without_versions_has_empty_projects(self):
+        results = [("org/a", {})]
+        data = build_version_report(results)
+        assert data["repos"][0] == {"repo": "org/a", "projects": {}}
 
 
 class TestMatchesPattern:

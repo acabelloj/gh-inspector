@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
+from output import OutputMode, OutputOption, emit, get_ctx, resolve_output
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion
 from packaging.version import parse as parse_version
@@ -90,7 +91,7 @@ def get_files(gh_client, repo_name, file_patterns, branch=None):
                     break
         return matched, _find_project_roots(tree)
     except Exception as e:
-        console.print(f"[red]Error retrieving file list for {repo_name}: {e}[/red]")
+        gh_client.console.print(f"[red]Error retrieving file list for {repo_name}: {e}[/red]")
         return [], set()
 
 
@@ -112,9 +113,9 @@ def process_repo(gh_client, repo, file_patterns):
                     for version, category in extract_versions_for_file(file, content):
                         projects[project][category][version].add(file)
                 except Exception as e:
-                    console.print(f"[red]Error processing {file} in {repo_name}: {e}[/red]")
+                    gh_client.console.print(f"[red]Error processing {file} in {repo_name}: {e}[/red]")
     except Exception as e:
-        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
+        gh_client.console.print(f"[red]Error processing {repo_name}: {e}[/red]")
     return repo_name, dict(projects)
 
 
@@ -191,6 +192,48 @@ def _iter_projects(all_repo_results):
         for project_key, results in sorted(projects.items()):
             display = f"{repo_name} [{project_key}]" if project_key else repo_name
             yield display, results
+
+
+def _project_status(results) -> str:
+    issues = check_consistency(results[VersionCategory.RUNTIME], results[VersionCategory.MINIMUM])
+    if issues:
+        return "inconsistent"
+    if results[VersionCategory.RUNTIME] or results[VersionCategory.MINIMUM]:
+        return "ok"
+    return "none"
+
+
+def build_version_report(all_repo_results: list[tuple[str, dict]]) -> dict:
+    """Build JSON-serializable Python-version data from raw per-repo results."""
+    runtime_distribution: dict[str, int] = defaultdict(int)
+    repos_out: list[dict] = []
+
+    for repo_name, projects in sorted(all_repo_results, key=lambda x: x[0]):
+        projects_out: dict[str, dict] = {}
+        for project_key, results in sorted((projects or {}).items()):
+            if not any(results[cat] for cat in VersionCategory):
+                continue
+            for v in results[VersionCategory.RUNTIME]:
+                base = _base_version(v)
+                if base:
+                    normalized = ".".join(base.split(".")[:2])
+                    runtime_distribution[normalized] += 1
+            issues = check_consistency(results[VersionCategory.RUNTIME], results[VersionCategory.MINIMUM])
+            projects_out[project_key] = {
+                "runtime": sorted(results[VersionCategory.RUNTIME], key=version_key),
+                "minimum": sorted(results[VersionCategory.MINIMUM], key=version_key),
+                "ci": sorted(results[VersionCategory.CI], key=version_key),
+                "status": _project_status(results),
+                "issues": issues,
+            }
+        repos_out.append({"repo": repo_name, "projects": projects_out})
+
+    return {
+        "repos": repos_out,
+        "runtime_distribution": dict(
+            sorted(runtime_distribution.items(), key=lambda x: version_key(x[0]), reverse=True)
+        ),
+    }
 
 
 def display_results(all_repo_results: list[tuple[str, dict]]) -> None:
@@ -334,6 +377,7 @@ def display_results(all_repo_results: list[tuple[str, dict]]) -> None:
 
 
 def find_python_version(
+    ctx: typer.Context,
     org_name: str = typer.Argument(..., help="GitHub organization name"),
     file_types: list[str] = typer.Option(
         None,
@@ -352,6 +396,7 @@ def find_python_version(
         "-a",
         help="Scan every repository in the organization. By default only repositories whose primary language is Python are checked.",
     ),
+    output: OutputOption = OutputMode.RICH,
 ):
     """Analyze Python version usage across repositories of a GitHub organization.
 
@@ -373,7 +418,9 @@ def find_python_version(
         Include non-Python repos in the scan:
             gh-inspector find-python-version my-org --all-repositories
     """
-    gh_client = GitHubClient(console=console)
+    resolve_output(ctx, output)
+    scan_console = get_ctx(ctx).scan_console
+    gh_client = GitHubClient(console=scan_console)
     file_patterns = file_types if file_types else FILE_PATTERNS
     repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
     all_repo_results = []
@@ -385,7 +432,7 @@ def find_python_version(
         "Scanning repos",
         "with versions",
         gh_client,
-        console,
+        scan_console,
     ):
         repo_name = repo["nameWithOwner"]
         all_repo_results.append((repo_name, projects))
@@ -393,4 +440,8 @@ def find_python_version(
             found_count += 1
         update(found_count)
 
-    display_results(all_repo_results)
+    emit(
+        ctx,
+        build_version_report(all_repo_results),
+        lambda: display_results(all_repo_results),
+    )

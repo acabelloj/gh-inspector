@@ -2,6 +2,7 @@ from collections import defaultdict
 
 import typer
 from github_client import GitHubClient
+from output import OutputMode, OutputOption, emit, get_ctx, resolve_output
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
@@ -57,7 +58,7 @@ def process_repo(gh_client: GitHubClient, repo: dict) -> tuple[str, list[tuple[s
         entries = parse_codeowners(content)
         return (repo_name, entries)
     except Exception as e:
-        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
+        gh_client.console.print(f"[red]Error processing {repo_name}: {e}[/red]")
         return None
 
 
@@ -119,7 +120,46 @@ def display_missing_table(missing: list[str]) -> None:
     console.print()
 
 
+def build_codeowners(
+    owner_data: dict[str, list[tuple[str, list[str]]]],
+    found_repos: list[str],
+    missing: list[str],
+    output_format: str,
+    skip_missing: bool,
+) -> dict:
+    """Build JSON-serializable CODEOWNERS data respecting the selected view."""
+    result: dict = {}
+    if output_format == "only_repo":
+        result["repos_with_codeowners"] = sorted(found_repos)
+    else:
+        result["owners"] = {owner: dict(repos) for owner, repos in owner_data.items()}
+    if not skip_missing:
+        result["repos_without_codeowners"] = sorted(missing)
+    return result
+
+
+def _render_codeowners(
+    owner_data: dict[str, list[tuple[str, list[str]]]],
+    found_repos: list[str],
+    missing: list[str],
+    output_format: str,
+    skip_missing: bool,
+) -> None:
+    """Render CODEOWNERS results as a Rich tree/tables (the default view)."""
+    if output_format == "only_repo":
+        display_repo_table(found_repos)
+    else:
+        if owner_data:
+            display_tree(owner_data)
+        else:
+            console.print("[yellow]No CODEOWNERS entries found.[/yellow]\n")
+
+    if not skip_missing and missing:
+        display_missing_table(missing)
+
+
 def find_codeowners(
+    ctx: typer.Context,
     org_name: str = typer.Argument(..., help="GitHub organization name"),
     output_format: str = typer.Option(
         "default",
@@ -144,6 +184,7 @@ def find_codeowners(
         "--skip-missing",
         help="Do not list repos that lack a CODEOWNERS file.",
     ),
+    output: OutputOption = OutputMode.RICH,
 ):
     """Find and display CODEOWNERS across repositories of a GitHub organization.
 
@@ -167,7 +208,9 @@ def find_codeowners(
         Hide repos without CODEOWNERS:
             gh-inspector find-codeowners my-org --skip-missing
     """
-    gh_client = GitHubClient(console=console)
+    resolve_output(ctx, output)
+    scan_console = get_ctx(ctx).scan_console
+    gh_client = GitHubClient(console=scan_console)
     repos = gh_client.get_repos(org_name, not python_only, extra_fields=["defaultBranchRef"])
 
     found: list[tuple[str, list[tuple[str, list[str]]]]] = []
@@ -179,7 +222,7 @@ def find_codeowners(
         "Scanning repos",
         "with CODEOWNERS",
         gh_client,
-        console,
+        scan_console,
     ):
         if result is None:
             missing.append(repo["nameWithOwner"])
@@ -187,16 +230,13 @@ def find_codeowners(
             found.append(result)
         update(len(found))
 
-    if output_format == "only_repo":
-        display_repo_table([repo for repo, _ in found])
-    else:
-        owner_data = aggregate_by_owner(found)
-        if teams:
-            owner_data = {k: v for k, v in owner_data.items() if k in teams}
-        if owner_data:
-            display_tree(owner_data)
-        else:
-            console.print("[yellow]No CODEOWNERS entries found.[/yellow]\n")
+    owner_data = aggregate_by_owner(found)
+    if teams:
+        owner_data = {k: v for k, v in owner_data.items() if k in teams}
+    found_repos = [repo for repo, _ in found]
 
-    if not skip_missing and missing:
-        display_missing_table(missing)
+    emit(
+        ctx,
+        build_codeowners(owner_data, found_repos, missing, output_format, skip_missing),
+        lambda: _render_codeowners(owner_data, found_repos, missing, output_format, skip_missing),
+    )

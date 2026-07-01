@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
+from output import OutputMode, OutputOption, emit, get_ctx, resolve_output
 from packaging.version import parse as parse_version
 from rich.console import Console
 from rich.table import Table
@@ -38,7 +39,7 @@ def process_file(gh_client, repo_name, file_path, parser, libraries):
         for lib_name, version in parser.extract(content, libraries).items():
             results[f"{lib_name}$v{version}"].append(f"{repo_name} ({file_path})")
     except Exception as e:
-        console.print(f"[red]Error processing {file_path} in {repo_name}: {e}[/red]")
+        gh_client.console.print(f"[red]Error processing {file_path} in {repo_name}: {e}[/red]")
     return results
 
 
@@ -57,8 +58,36 @@ def process_repo(gh_client, repo, libraries, file_types):
                 for key, values in future.result().items():
                     all_results[key].extend(values)
     except Exception as e:
-        console.print(f"[red]Error processing {repo_name}: {e}[/red]")
+        gh_client.console.print(f"[red]Error processing {repo_name}: {e}[/red]")
     return all_results
+
+
+def _parse_repo_file(repo_file: str) -> dict:
+    """Split a 'org/repo (path/to/file)' entry into structured fields."""
+    repo, _, rest = repo_file.partition(" (")
+    file_path = rest[:-1] if rest.endswith(")") else rest
+    return {"repo": repo, "file": file_path}
+
+
+def build_library_versions(library_versions, output_format) -> dict:
+    """Build JSON-serializable library-version data respecting the selected view."""
+    if output_format == "only_repo":
+        repos = {repo_file.split()[0] for _, files in library_versions for repo_file in files}
+        return {"repos": sorted(repos)}
+
+    libraries_data: dict[str, dict[str, list[dict]]] = defaultdict(dict)
+    grouped: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+    for lib_version, repo_files in library_versions:
+        lib_name, version = lib_version.split("$v")
+        grouped[lib_name][version].extend(repo_files)
+
+    for lib_name in sorted(grouped):
+        versions = grouped[lib_name]
+        libraries_data[lib_name] = {
+            version: [_parse_repo_file(rf) for rf in versions[version]]
+            for version in sorted(versions, key=parse_version, reverse=True)
+        }
+    return {"libraries": dict(libraries_data)}
 
 
 def print_results(library_versions, libraries, output_format):
@@ -103,6 +132,7 @@ def print_results(library_versions, libraries, output_format):
 
 
 def find_python_library(
+    ctx: typer.Context,
     org_name: str = typer.Argument(..., help="GitHub organization name"),
     libraries: list[str] = typer.Argument(..., help="List of libraries to analyze"),
     output_format: str = typer.Option(
@@ -123,6 +153,7 @@ def find_python_library(
         "-a",
         help="Scan every repository in the organization. By default only repositories whose primary language is Python are checked.",
     ),
+    output: OutputOption = OutputMode.RICH,
 ):
     """Analyze library usage across repositories of a GitHub organization.
 
@@ -146,7 +177,9 @@ def find_python_library(
         Include non-Python repos in the scan:
             gh-inspector find-python-library my-org requests --all-repositories
     """
-    gh_client = GitHubClient(console=console)
+    resolve_output(ctx, output)
+    scan_console = get_ctx(ctx).scan_console
+    gh_client = GitHubClient(console=scan_console)
 
     repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
     library_versions = defaultdict(list)
@@ -158,7 +191,7 @@ def find_python_library(
         "Scanning repos",
         "with matches",
         gh_client,
-        console,
+        scan_console,
     ):
         for version, repo_files in result.items():
             library_versions[version].extend(repo_files)
@@ -166,4 +199,9 @@ def find_python_library(
             found_repos.add(repo["nameWithOwner"])
         update(len(found_repos))
 
-    print_results(library_versions.items(), libraries, output_format)
+    version_items = list(library_versions.items())
+    emit(
+        ctx,
+        build_library_versions(version_items, output_format),
+        lambda: print_results(version_items, libraries, output_format),
+    )

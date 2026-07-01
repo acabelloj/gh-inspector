@@ -4,10 +4,33 @@ from commands.find_codeowners import (
     _format_patterns,
     _is_owner,
     aggregate_by_owner,
+    build_codeowners,
     find_codeowners_file,
     parse_codeowners,
     process_repo,
 )
+
+
+class TestBuildCodeowners:
+    def test_default_view(self):
+        owner_data = {"@org/backend": [("org/repo1", ["*.py"])]}
+        data = build_codeowners(owner_data, ["org/repo1"], ["org/repo2"], "default", skip_missing=False)
+        assert data == {
+            "owners": {"@org/backend": {"org/repo1": ["*.py"]}},
+            "repos_without_codeowners": ["org/repo2"],
+        }
+
+    def test_only_repo_view(self):
+        owner_data = {"@org/backend": [("org/repo1", ["*.py"])]}
+        data = build_codeowners(owner_data, ["org/repo1"], ["org/repo2"], "only_repo", skip_missing=False)
+        assert data == {
+            "repos_with_codeowners": ["org/repo1"],
+            "repos_without_codeowners": ["org/repo2"],
+        }
+
+    def test_skip_missing_omits_key(self):
+        data = build_codeowners({}, [], ["org/repo2"], "default", skip_missing=True)
+        assert "repos_without_codeowners" not in data
 
 
 class TestFormatPatterns:

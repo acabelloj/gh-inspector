@@ -1,0 +1,52 @@
+# serializer version: 1
+# name: test_find_codeowners_json
+  '''
+  {
+    "owners": {
+      "@org/backend": {
+        "org/alpha": [
+          "/src/"
+        ],
+        "org/beta": [
+          "*.py"
+        ]
+      },
+      "@org/platform": {
+        "org/alpha": [
+          "*"
+        ]
+      }
+    },
+    "repos_without_codeowners": [
+      "org/gamma"
+    ]
+  }
+  
+  '''
+# ---
+# name: test_find_codeowners_rich
+  '''
+  gh-inspector v0.4.1
+  
+    Scanning repos ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3/3 • 0:00:00 • 0:00:00 • 0 active • ✓ 2 with CODEOWNERS • 0 gh calls
+  Total GitHub API calls: 0
+  
+  CODEOWNERS by Owner
+  ├── @org/backend
+  │   ├── org/alpha (/src/)
+  │   └── org/beta (*.py)
+  └── @org/platform
+      └── org/alpha (entire repo)
+  
+   Repositories 
+     without    
+    CODEOWNERS  
+  ┏━━━━━━━━━━━━┓
+  ┃ Repository ┃
+  ┡━━━━━━━━━━━━┩
+  │ org/gamma  │
+  └────────────┘
+  
+  
+  '''
+# ---

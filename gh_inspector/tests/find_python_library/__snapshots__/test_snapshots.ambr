@@ -1,0 +1,46 @@
+# serializer version: 1
+# name: test_find_python_library_json
+  '''
+  {
+    "libraries": {
+      "requests": {
+        "2.31.0": [
+          {
+            "repo": "org/alpha",
+            "file": "requirements.txt"
+          }
+        ],
+        "2.28.0": [
+          {
+            "repo": "org/beta",
+            "file": "requirements.txt"
+          }
+        ]
+      }
+    }
+  }
+  
+  '''
+# ---
+# name: test_find_python_library_rich
+  '''
+  gh-inspector v0.4.1
+  
+    Scanning repos ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2/2 • 0:00:00 • 0:00:00 • 0 active • ✓ 2 with matches • 0 gh calls
+  Total GitHub API calls: 0
+  
+  
+  Version Usage for libraries: requests
+  
+                        Library: requests                      
+  ┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃ Version         ┃  Count   ┃ Repositories (Files)         ┃
+  ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+  │ 2.31.0          │    1     │ org/alpha (requirements.txt) │
+  ├─────────────────┼──────────┼──────────────────────────────┤
+  │ 2.28.0          │    1     │ org/beta (requirements.txt)  │
+  └─────────────────┴──────────┴──────────────────────────────┘
+  
+  
+  '''
+# ---
