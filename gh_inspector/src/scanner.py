@@ -18,6 +18,22 @@ from rich.progress import (
 MAX_WORKERS = 6
 
 
+def _scan_repos_quiet(
+    repos: list[dict],
+    fn: Callable[[dict], Any],
+    max_workers: int,
+) -> Generator[tuple[dict, Any, Callable[[int], None]], None, None]:
+    """Run fn(repo) concurrently with no progress bar or totals; update_fn is a no-op."""
+
+    def _noop(_found_count: int) -> None:
+        pass
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(fn, repo): repo for repo in repos}
+        for future in as_completed(futures):
+            yield futures[future], future.result(), _noop
+
+
 def scan_repos(
     repos: list[dict],
     fn: Callable[[dict], Any],
@@ -26,12 +42,18 @@ def scan_repos(
     gh_client: GitHubClient,
     console: Console,
     max_workers: int = MAX_WORKERS,
+    quiet: bool = False,
 ) -> Generator[tuple[dict, Any, Callable[[int], None]], None, None]:
     """Run fn(repo) concurrently, yielding (repo, result, update_fn) for each completed repo.
 
     update_fn(found_count) must be called exactly once per yielded item to advance
     the progress bar. After all repos are processed, prints the total gh API call count.
+    In quiet mode the progress bar and totals line are suppressed and update_fn is a no-op.
     """
+    if quiet:
+        yield from _scan_repos_quiet(repos, fn, max_workers)
+        return
+
     in_progress: set[str] = set()
     lock = threading.Lock()
 

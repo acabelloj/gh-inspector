@@ -39,18 +39,22 @@ This file documents conventions for AI agents (Claude, Codex, Copilot, etc.) wor
 gh_inspector/
   src/
     main.py                  # Typer app entry point, command registration
-    github_client.py         # GitHubClient — wraps gh CLI via subprocess
+    github_client.py         # GitHubClient — wraps gh CLI via subprocess (paginates repos)
+    cache.py                 # ResponseCache + `cache` CLI group (clear/path/info)
+    output.py                # output modes, global options, AppContext, emit/summary helpers
+    scanner.py               # scan_repos — concurrent repo scan + progress bar
     commands/
-      find_python_library.py # find-python-library command
-      find_python_version.py # find-python-version command
+      find_codeowners.py     # find-codeowners command
+      find_licenses.py       # find-licenses command
+      find_python_library/   # find-python-library command + dependency-file parsers
+      find_python_version/   # find-python-version command + version extractors
   tests/
-    test_github_client.py
-    test_main.py
-    find_python_library/
-      fixtures/          # sample dependency files for parser tests
-      test_find_python_library.py
-    find_python_version/
-      test_find_python_version.py
+    test_github_client.py    # client, endpoint selection, cache, rate-limit backoff
+    test_cache.py            # ResponseCache unit tests
+    test_cache_command.py    # `cache` subcommand tests
+    test_main.py             # global flags, output mode, fatal-error handling
+    test_output.py           # emit / resolve seam
+    <command>/               # per-command tests + __snapshots__ (rich + json)
 ```
 
 ## Adding a New Command

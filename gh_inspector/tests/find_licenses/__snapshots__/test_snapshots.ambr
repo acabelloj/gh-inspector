@@ -2,6 +2,15 @@
 # name: test_find_licenses_json
   '''
   {
+    "summary": {
+      "org": "org",
+      "all_repositories": true,
+      "repos_scanned": 4,
+      "repos_with_matches": 4,
+      "repos_errored": 0,
+      "errored_repos": [],
+      "gh_api_calls": 0
+    },
     "licenses": {
       "Apache-2.0": [
         "org/beta"

@@ -237,22 +237,33 @@ class TestDisplayUnlicensedTable:
         assert "org/repo1" in output
 
 
-class TestGetReposExtraFields:
-    def setup_method(self):
-        self.client = GitHubClient()
+class TestGetReposLicenseMapping:
+    """get_repos maps the REST license object into the licenseInfo shape find-licenses reads."""
 
-    def test_extra_fields_appended(self):
-        repos = [{"nameWithOwner": "org/repo", "isPrivate": False, "licenseInfo": None}]
-        with patch.object(self.client, "run_command", return_value=json.dumps(repos)) as mock_cmd:
-            self.client.get_repos("org", all_repositories=True, extra_fields=["licenseInfo"])
-            args = mock_cmd.call_args[0][0]
-            json_idx = args.index("--json")
-            assert "licenseInfo" in args[json_idx + 1]
+    def _paginated(self, *rest):
+        def side_effect(args, timeout=None):
+            if "--paginate" in args:
+                return json.dumps([list(rest)])
+            return json.dumps({"type": "Organization"})  # gh api users/<name>
 
-    def test_no_extra_fields_unchanged(self):
-        repos = [{"nameWithOwner": "org/repo", "isPrivate": False}]
-        with patch.object(self.client, "run_command", return_value=json.dumps(repos)) as mock_cmd:
-            self.client.get_repos("org", all_repositories=True)
-            args = mock_cmd.call_args[0][0]
-            json_idx = args.index("--json")
-            assert args[json_idx + 1] == "nameWithOwner,isPrivate"
+        return side_effect
+
+    def test_license_mapped_to_license_info(self):
+        client = GitHubClient()
+        rest = {
+            "full_name": "org/repo",
+            "private": False,
+            "language": "Python",
+            "archived": False,
+            "license": {"spdx_id": "MIT"},
+        }
+        with patch.object(client, "run_command", side_effect=self._paginated(rest)):
+            (repo,) = client.get_repos("org", all_repositories=True)
+        assert extract_license_id(repo) == "MIT"
+
+    def test_missing_license_is_none(self):
+        client = GitHubClient()
+        rest = {"full_name": "org/repo", "private": False, "language": "Python", "archived": False, "license": None}
+        with patch.object(client, "run_command", side_effect=self._paginated(rest)):
+            (repo,) = client.get_repos("org", all_repositories=True)
+        assert extract_license_id(repo) is None

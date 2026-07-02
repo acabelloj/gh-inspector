@@ -1,16 +1,22 @@
 """Shared fixtures for snapshot tests.
 
-Snapshots must be deterministic across machines, so Rich output is captured at a
-fixed console width. In non-TTY mode (as under CliRunner) Rich honours the
-``COLUMNS`` env var for width, giving stable rendered tables/trees.
+Snapshots must be deterministic across machines, so Rich output is captured as
+stable plain text: a fixed console width, and ``NO_COLOR`` to disable colour, styles,
+and the animated progress spinner (see ``output.make_console``). ``NO_COLOR`` is set
+at import time — before the command modules build their module-level consoles — so it
+takes effect for every test.
 """
 
+import os
+
 import pytest
+
+os.environ["NO_COLOR"] = "1"
 
 
 @pytest.fixture(autouse=True)
 def _fixed_console_width(monkeypatch):
-    """Pin terminal width so Rich renders identically everywhere."""
+    """Pin terminal width so Rich renders tables identically everywhere."""
     monkeypatch.setenv("COLUMNS", "120")
     monkeypatch.setenv("LINES", "40")
 
@@ -22,12 +28,16 @@ class FakeGitHubClient:
     its file tree (list of {"path": ...}). ``files`` maps (repo, path) to content.
     """
 
-    def __init__(self, repos=None, trees=None, files=None, console=None):
+    def __init__(self, repos=None, trees=None, files=None, console=None, **_kwargs):
         self._repos = repos or []
         self._trees = trees or {}
         self._files = files or {}
         self.console = console
         self.call_count = 0
+        self.errors = []
+
+    def record_error(self, repo, message):
+        self.errors.append({"repo": repo, "error": message})
 
     def get_repos(self, org_name, all_repositories=False, extra_fields=None):
         return self._repos
@@ -55,7 +65,7 @@ def fake_client_factory():
     """
 
     def make(repos=None, trees=None, files=None):
-        def factory(console=None):
+        def factory(console=None, **_kwargs):
             return FakeGitHubClient(repos=repos, trees=trees, files=files, console=console)
 
         return factory

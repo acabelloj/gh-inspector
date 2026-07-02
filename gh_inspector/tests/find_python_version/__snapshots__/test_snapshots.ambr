@@ -2,6 +2,15 @@
 # name: test_find_python_version_json
   '''
   {
+    "summary": {
+      "org": "org",
+      "all_repositories": true,
+      "repos_scanned": 3,
+      "repos_with_matches": 2,
+      "repos_errored": 0,
+      "errored_repos": [],
+      "gh_api_calls": 0
+    },
     "repos": [
       {
         "repo": "org/alpha",

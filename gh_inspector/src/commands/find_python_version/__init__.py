@@ -4,17 +4,33 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
-from output import OutputMode, OutputOption, emit, get_ctx, resolve_output
+from output import (
+    DEFAULT_CACHE_TTL,
+    DEFAULT_TIMEOUT,
+    CacheTtlOption,
+    ClearCacheOption,
+    NoCacheOption,
+    OutputMode,
+    OutputOption,
+    QuietOption,
+    TimeoutOption,
+    VerboseOption,
+    build_summary,
+    emit,
+    emit_error,
+    get_ctx,
+    make_console,
+    resolve_globals,
+)
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion
 from packaging.version import parse as parse_version
-from rich.console import Console
 from rich.table import Table
 from scanner import scan_repos
 
 from .extractors import EXTRACTORS, VersionCategory
 
-console = Console()
+console = make_console()
 
 FILE_WORKERS = 3
 
@@ -92,6 +108,7 @@ def get_files(gh_client, repo_name, file_patterns, branch=None):
         return matched, _find_project_roots(tree)
     except Exception as e:
         gh_client.console.print(f"[red]Error retrieving file list for {repo_name}: {e}[/red]")
+        gh_client.record_error(repo_name, f"file list: {e}")
         return [], set()
 
 
@@ -114,8 +131,10 @@ def process_repo(gh_client, repo, file_patterns):
                         projects[project][category][version].add(file)
                 except Exception as e:
                     gh_client.console.print(f"[red]Error processing {file} in {repo_name}: {e}[/red]")
+                    gh_client.record_error(repo_name, f"{file}: {e}")
     except Exception as e:
         gh_client.console.print(f"[red]Error processing {repo_name}: {e}[/red]")
+        gh_client.record_error(repo_name, str(e))
     return repo_name, dict(projects)
 
 
@@ -397,6 +416,12 @@ def find_python_version(
         help="Scan every repository in the organization. By default only repositories whose primary language is Python are checked.",
     ),
     output: OutputOption = OutputMode.RICH,
+    no_cache: NoCacheOption = False,
+    clear_cache: ClearCacheOption = False,
+    cache_ttl: CacheTtlOption = DEFAULT_CACHE_TTL,
+    timeout: TimeoutOption = DEFAULT_TIMEOUT,
+    verbose: VerboseOption = False,
+    quiet: QuietOption = False,
 ):
     """Analyze Python version usage across repositories of a GitHub organization.
 
@@ -418,11 +443,17 @@ def find_python_version(
         Include non-Python repos in the scan:
             gh-inspector find-python-version my-org --all-repositories
     """
-    resolve_output(ctx, output)
-    scan_console = get_ctx(ctx).scan_console
-    gh_client = GitHubClient(console=scan_console)
+    resolve_globals(ctx, output, no_cache, clear_cache, cache_ttl, timeout, verbose, quiet)
+    app_ctx = get_ctx(ctx)
+    scan_console = app_ctx.scan_console
+    gh_client = GitHubClient(
+        timeout=app_ctx.timeout, console=scan_console, cache=app_ctx.cache(), verbose=app_ctx.verbose
+    )
     file_patterns = file_types if file_types else FILE_PATTERNS
-    repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
+    try:
+        repos = gh_client.get_repos(org_name, all_repositories)
+    except Exception as e:
+        emit_error(ctx, f"Failed to list repositories for {org_name}: {e}", org=org_name)
     all_repo_results = []
     found_count = 0
 
@@ -433,6 +464,7 @@ def find_python_version(
         "with versions",
         gh_client,
         scan_console,
+        quiet=app_ctx.quiet,
     ):
         repo_name = repo["nameWithOwner"]
         all_repo_results.append((repo_name, projects))
@@ -444,4 +476,11 @@ def find_python_version(
         ctx,
         build_version_report(all_repo_results),
         lambda: display_results(all_repo_results),
+        summary=build_summary(
+            org_name,
+            all_repositories,
+            repos_scanned=len(repos),
+            repos_matched=found_count,
+            gh_client=gh_client,
+        ),
     )
