@@ -21,6 +21,12 @@ def _fixed_console_width(monkeypatch):
     monkeypatch.setenv("LINES", "40")
 
 
+@pytest.fixture(autouse=True)
+def _fixed_version(monkeypatch):
+    """Pin the reported version so snapshots don't churn on every release bump."""
+    monkeypatch.setattr("main.__version__", "0.0.0-test")
+
+
 class FakeGitHubClient:
     """Drop-in replacement for GitHubClient driven by in-memory fixture data.
 

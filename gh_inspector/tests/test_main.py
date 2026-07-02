@@ -32,17 +32,20 @@ def _stub_client(repos):
 
 
 class TestVersion:
-    def test_version_flag(self):
+    def test_version_flag(self, monkeypatch):
+        monkeypatch.setattr("main.__version__", VERSION)
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
         assert f"gh-inspector {VERSION}" in result.output
 
-    def test_version_short_flag(self):
+    def test_version_short_flag(self, monkeypatch):
+        monkeypatch.setattr("main.__version__", VERSION)
         result = runner.invoke(app, ["-v"])
         assert result.exit_code == 0
         assert f"gh-inspector {VERSION}" in result.output
 
     def test_banner_shown_on_command(self, monkeypatch):
+        monkeypatch.setattr("main.__version__", VERSION)
         monkeypatch.setattr("commands.find_python_version.GitHubClient", _stub_client([]))
         result = runner.invoke(app, ["find-python-version", "someorg"])
         assert f"gh-inspector v{VERSION}" in result.output
