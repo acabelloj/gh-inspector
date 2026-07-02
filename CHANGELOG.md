@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.4.1...gh-inspector-v0.5.0) (2026-07-02)
+
+
+### Features
+
+* add global --output json mode across all commands ([#86](https://github.com/acabelloj/gh-inspector/issues/86)) ([e719a5d](https://github.com/acabelloj/gh-inspector/commit/e719a5d144fd8ef91bde5a867be3c90c0ec7b637))
+* response cache, repo pagination, and verbosity control ([#88](https://github.com/acabelloj/gh-inspector/issues/88)) ([b06f39f](https://github.com/acabelloj/gh-inspector/commit/b06f39fcd28ddd52c39127afb6ec824c3d0e8339))
+* response cache, repo pagination, verbosity, and cache tooling ([b06f39f](https://github.com/acabelloj/gh-inspector/commit/b06f39fcd28ddd52c39127afb6ec824c3d0e8339))
+
+
+### Bug Fixes
+
+* pin CLI version in snapshot tests to survive release bumps ([#90](https://github.com/acabelloj/gh-inspector/issues/90)) ([2479299](https://github.com/acabelloj/gh-inspector/commit/2479299f23b5ec651526fe326d8febf48e723172))
+
 ## [0.4.1](https://github.com/acabelloj/gh-inspector/compare/gh-inspector-v0.4.0...gh-inspector-v0.4.1) (2026-03-07)
 
 
