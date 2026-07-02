@@ -61,7 +61,7 @@
 # ---
 # name: test_find_python_version_rich
   '''
-  gh-inspector v0.4.1
+  gh-inspector v0.0.0-test
   
     Scanning repos ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3/3 • 0:00:00 • 0:00:00 • 0 active • ✓ 2 with versions • 0 gh calls
   Total GitHub API calls: 0

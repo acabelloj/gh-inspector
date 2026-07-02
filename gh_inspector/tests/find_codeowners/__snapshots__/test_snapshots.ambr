@@ -35,7 +35,7 @@
 # ---
 # name: test_find_codeowners_rich
   '''
-  gh-inspector v0.4.1
+  gh-inspector v0.0.0-test
   
     Scanning repos ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3/3 • 0:00:00 • 0:00:00 • 0 active • ✓ 2 with CODEOWNERS • 0 gh calls
   Total GitHub API calls: 0
