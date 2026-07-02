@@ -4,15 +4,31 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from github_client import GitHubClient
-from output import OutputMode, OutputOption, emit, get_ctx, resolve_output
+from output import (
+    DEFAULT_CACHE_TTL,
+    DEFAULT_TIMEOUT,
+    CacheTtlOption,
+    ClearCacheOption,
+    NoCacheOption,
+    OutputMode,
+    OutputOption,
+    QuietOption,
+    TimeoutOption,
+    VerboseOption,
+    build_summary,
+    emit,
+    emit_error,
+    get_ctx,
+    make_console,
+    resolve_globals,
+)
 from packaging.version import parse as parse_version
-from rich.console import Console
 from rich.table import Table
 from scanner import scan_repos
 
 from .parsers import PARSERS, matches_pattern
 
-console = Console()
+console = make_console()
 
 FILE_WORKERS = 3
 
@@ -40,6 +56,7 @@ def process_file(gh_client, repo_name, file_path, parser, libraries):
             results[f"{lib_name}$v{version}"].append(f"{repo_name} ({file_path})")
     except Exception as e:
         gh_client.console.print(f"[red]Error processing {file_path} in {repo_name}: {e}[/red]")
+        gh_client.record_error(repo_name, f"{file_path}: {e}")
     return results
 
 
@@ -59,6 +76,7 @@ def process_repo(gh_client, repo, libraries, file_types):
                     all_results[key].extend(values)
     except Exception as e:
         gh_client.console.print(f"[red]Error processing {repo_name}: {e}[/red]")
+        gh_client.record_error(repo_name, str(e))
     return all_results
 
 
@@ -154,6 +172,12 @@ def find_python_library(
         help="Scan every repository in the organization. By default only repositories whose primary language is Python are checked.",
     ),
     output: OutputOption = OutputMode.RICH,
+    no_cache: NoCacheOption = False,
+    clear_cache: ClearCacheOption = False,
+    cache_ttl: CacheTtlOption = DEFAULT_CACHE_TTL,
+    timeout: TimeoutOption = DEFAULT_TIMEOUT,
+    verbose: VerboseOption = False,
+    quiet: QuietOption = False,
 ):
     """Analyze library usage across repositories of a GitHub organization.
 
@@ -177,11 +201,17 @@ def find_python_library(
         Include non-Python repos in the scan:
             gh-inspector find-python-library my-org requests --all-repositories
     """
-    resolve_output(ctx, output)
-    scan_console = get_ctx(ctx).scan_console
-    gh_client = GitHubClient(console=scan_console)
+    resolve_globals(ctx, output, no_cache, clear_cache, cache_ttl, timeout, verbose, quiet)
+    app_ctx = get_ctx(ctx)
+    scan_console = app_ctx.scan_console
+    gh_client = GitHubClient(
+        timeout=app_ctx.timeout, console=scan_console, cache=app_ctx.cache(), verbose=app_ctx.verbose
+    )
 
-    repos = gh_client.get_repos(org_name, all_repositories, extra_fields=["defaultBranchRef"])
+    try:
+        repos = gh_client.get_repos(org_name, all_repositories)
+    except Exception as e:
+        emit_error(ctx, f"Failed to list repositories for {org_name}: {e}", org=org_name)
     library_versions = defaultdict(list)
     found_repos: set[str] = set()
 
@@ -192,6 +222,7 @@ def find_python_library(
         "with matches",
         gh_client,
         scan_console,
+        quiet=app_ctx.quiet,
     ):
         for version, repo_files in result.items():
             library_versions[version].extend(repo_files)
@@ -204,4 +235,12 @@ def find_python_library(
         ctx,
         build_library_versions(version_items, output_format),
         lambda: print_results(version_items, libraries, output_format),
+        summary=build_summary(
+            org_name,
+            all_repositories,
+            repos_scanned=len(repos),
+            repos_matched=len(found_repos),
+            gh_client=gh_client,
+            libraries_requested=libraries,
+        ),
     )
