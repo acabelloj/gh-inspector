@@ -1,4 +1,9 @@
 # main dependencies
-django==4.2.0
+asgiref==3.12.1
+certifi==2026.7.22
+charset-normalizer==3.4.9
+django==5.2.16
+idna==3.18
 requests==2.31.0
-gunicorn==21.2.0
+sqlparse==0.5.5
+urllib3==2.7.0
